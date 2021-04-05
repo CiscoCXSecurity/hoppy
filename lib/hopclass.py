@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.5.9
+	Version 1.5.10
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -291,11 +291,9 @@ class connection:
 			(num, name) = e
 			#print '\n\t[!] Host Lookup Failure - ' + name + ' - Check hostname (-h)'
 			test.result = name
-
-		s.close()
-
-
- 		test.recieved = returnbuff
+		finally:
+			s.close()
+	 		test.recieved = returnbuff
 		
 	#sys.exit(2)
 

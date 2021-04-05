@@ -11,7 +11,7 @@
 #																
 #
 #
-# Supplied with hoppy 1.5.9 
+# Supplied with hoppy 1.5.10 
 
 
 Allow, 0
@@ -39,3 +39,4 @@ Via:, 0
 ETag:, 0
 google, 1
 Version Information:, 1
+password, 1

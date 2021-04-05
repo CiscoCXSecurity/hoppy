@@ -1,28 +1,38 @@
+<1.5.10> - 22/05/2008 - added thread locking so output is not jumbleed on screen/disk
+						modified the keyboard handler so CTRL-C is caught twice, 
+												once to wait for threads second to not
+						fixed threading problem so that max thread count is adhered to
+
+<1.5.9> - 20/05/2008 - fixed a bug with the printing of what is being done in verbose mode
+					   added two new methods of detecting track/trace
+					   removed the :(port) directive from the standard methods file as some servers seemed to not
+					   properly associate vhosts
+
 <1.5.8> - 03/04/2008 - fixed a bug with the check done when settign a port number
 
 <1.5.7> - 29/02/2008 - fixed bug in finding http-methods file if installed into a firrerent location
-		     - on the 29th just because i could
+		   			   on the 29th just because i could
 
 <1.5.6> - 26/02/2008 - fixed some bugs in handling wierd server headers
-		       fixed a bug with mutlipart encoding
-		       added some more info methods
+		   			   fixed a bug with mutlipart encoding
+					   added some more info methods
 
 <1.5.5> - 07/02/2008 - changed the location syntax no longer do you put the trailing / on the dir
-		       it missed an internal IP hence the above change and the addition of a method
+		   			   it missed an internal IP hence the above change and the addition of a method
 					   
 <1.5.4> - 21/01/2008 - bugfixes in summry output
 
 <1.5.3> - 21/12/2007 - it's now multi threaded
-		     - added data extract mode (2 in responce keywords)
-	       	     - tweaked the output when erroring in test file
-		     - fixed exception handling of CTRL-C to exit in vernose mode
-		     - better handling of a server dying in mid test
+				       added data extract mode (2 in responce keywords)
+	 	      	       tweaked the output when erroring in test file
+				       fixed exception handling of CTRL-C to exit in vernose mode
+				       better handling of a server dying in mid test
 
 <1.5.2> - 14/12/2007 - added proper IP parsing
-                     - added robots.txt check
+                       added robots.txt check
 
 <1.5.1> - 26/11/2207 - fixed bugs with Directory disclosure matching
-					 - fixed handling of some fail cases
+					   fixed handling of some fail cases
 
 <1.5.0> - 13/11/2207 - Complete hoppy rewrite now is OO
 					   Added (-S) save to file

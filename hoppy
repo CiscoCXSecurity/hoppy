@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.5.9 
+	Version 1.5.10 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 
 """
 
-version = '1.5.9'
+version = '1.5.10'
 
-import socket, sys, getopt, threading
+import socket, sys, getopt, threading, time
 from threading import Thread
 
 
@@ -54,20 +54,31 @@ class testit(Thread):
 		self.testhost = testhost 
 		self.name, self.method = x.split(',',1)
 		self.test = hopclass.test(self.name, self.method.lstrip().rstrip())
-		if verbose:
-			print2('\n[+] Testing ' + self.test.name + ' request on ' + testhost.location + '/' + testhost.file + '\n')
-			sys.stdout.flush()
 		if self.testhost.proxyon and not self.testhost.ssl:
 			self.test.method = addProxy(test.method)
-
+		
 	def run(self):
+
 		self.testhost.send(self.test)
 		self.testhost.errors += self.test.summarise(keywords)
-		self.test.export(sys.stdout, verbose)
+		screen.acquire()
+		try:
+			if verbose:
+				print2('\n[+] Testing ' + self.test.name + ' request on ' + testhost.location + '/' + testhost.file + '\n')
+			self.test.export(sys.stdout, verbose)
+			sys.stdout.flush()
+		finally:
+   			screen.release() # release lock, no matter what	
 		if savefile:
-			self.test.export(save, 3)
+			disk.acquire()
+			try:
+				self.test.export(save, 3)
+			finally:
+   				disk.release() # release lock, no matter what				
 		self.testhost.tests.append(self.test)
-
+		pool_sema.release()   
+    
+    
 __doc__ = '\n  hoppy ' + version + ' - (C) 2007 deanx\n\n' 
 __doc__ += '\t\t\t RID[at]Portcullis-Security.com\n\n' 
 __doc__ += '  Usage: ' + sys.argv[0] +' -h <[http[s]]://hostname[:port]> [options]\n\n'
@@ -408,6 +419,9 @@ maxthreads = '20'
 
 # read command line and inport config files
 
+screen = threading.Lock()
+disk = threading.Lock()
+
 try:
 	loadconfig(config_file)
 	testhost = hopclass.connection()
@@ -437,14 +451,22 @@ try:
 		pool_sema.acquire()
 		current = testit(testhost, x)
 		current.start()
-		pool_sema.release()		
 	while (threading.activeCount() > 1):
 		pass
-
-	if not verbose:
-		print2('\n\n\t[+] Done :-)')
 except KeyboardInterrupt:
-	pass
+	if not verbose:
+		print2('\n\n\t[+] Waiting for Threads to Finish ;-)\n\n\t[+] ')
+	else:
+		print2('\n\n[+] Ctrl-C Caught - Waiting for Threads to Finish\n\n')
+	try:
+		while (threading.activeCount() > 1):
+			pass
+	except KeyboardInterrupt:
+		pass
+			
+if not verbose:
+		print2('\n\n\t[+] Done :-)')
+
 testhost.summary()					
 testhost.exportSummary(sys.stdout, fof)
 if savefile:
@@ -453,8 +475,3 @@ if savefile:
 if testhost.errors and not fof:
 	print2('\n\t[+] ' + str(testhost.errors) + ' check(s) failed to return data, try incrreasing the socket timeout (-t) and re-run with the -4 switch for more information\n\n')
 sys.exit()
-
-
-
-
-

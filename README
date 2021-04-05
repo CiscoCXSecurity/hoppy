@@ -1,5 +1,5 @@
 
-[H]ttp [O]ptions [P]rober in [PY]thon - 1.5.9 
+[H]ttp [O]ptions [P]rober in [PY]thon - 1.5.10 
 
 This is hoppy, a http method prober, it is a python script which tests http methods for configuration issues leaking information or just to see if they are enabled.
 
