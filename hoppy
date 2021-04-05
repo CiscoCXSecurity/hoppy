@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.7.2 
+	Version 1.7.3 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 """
 
-version = '1.7.2'
+version = '1.7.3'
 
 import socket, sys, getopt, time, os
 
@@ -76,7 +76,7 @@ if not nothreading:
 				sys.stdout.flush()
 			finally:
    				screen.release() # release lock, no matter what	
-			if savefile:
+			if savefilebase:
 				disk.acquire()
 				try:
 					self.test.export(save, 3)
@@ -119,7 +119,7 @@ __doc__ += '\n  To use a web proxy set the ENV vairable HTTP_PROXY to [http[s]:/
 def print2(text):
 	global save, savefile
 	print text,
-	if savefile:
+	if savefilebase:
 		save.write(text)
 		save.flush()
 
@@ -158,7 +158,7 @@ def checkconfig(): # Check to make sure the config only conatins valid lines
 
 
 def parsecmd(argv, connection):
-	global verbose, fof, config_file, methodsfile, keywordsfile, savefile, loopfile, maxthreads, nothreading, host, save, spider
+	global verbose, fof, config_file, methodsfile, keywordsfile, savefilebase, savefilespider, savefileattack, loopfile, maxthreads, nothreading, host, save, spider
 	nossl = 0
 	portset = 0
 	check = 0
@@ -216,7 +216,7 @@ def parsecmd(argv, connection):
 		elif opt in ('-N', '--no-proxy'):
 			noproxy = 1
 		elif opt in ('-S', '--save'):
-			savefile = arg
+			savefilebase = arg
 		elif opt in ('-L', '--loop'):
 			loopfile = arg
 		elif opt in ('-A', '--apponly'):
@@ -226,9 +226,15 @@ def parsecmd(argv, connection):
 			host = 0
 			connection.host = arg
 			hset = hset + 1
-	if savefile:
-		save = opensavefile(savefile)
-		connection.save = save		
+	if savefilebase: # need to finished coding of spider output
+		suf = findnextfile(savefilebase)
+		savefileattack = savefilebase + ".attack" + suf
+		save = opensavefile(savefileattack)
+		connection.save = save
+		if not loopfile:
+			savefilespider = savefilebase + ".spider" + suf
+			savespider = opensavefile(savefilespider)
+			connection.savespider = savespider			
 	print2('\n[+] Configuring Test Environment\n')
 	if not hset:
 		print '\n\t[!] hostname (-h) is required\n'
@@ -355,6 +361,17 @@ def parsefile(file, name): #
 				continue
 			text.append(line)
 	return (text,errors)
+
+def findnextfile(file):
+	filespider = file + ".spider"
+	fileattack = file + ".attack"
+	if os.path.isfile(fileattack) or os.path.isfile(filespider):
+		x = 1
+		while os.path.isfile(fileattack + "." +str (x)) or os.path.isfile(filespider + "." +str (x)):
+				x += 1
+		return "." + str(x)
+	return ""
+
 
 def opensavefile(file): #
 	try:	# try to open the methods file
@@ -492,7 +509,9 @@ file_dir='/usr/share'
 config_file = '/etc/hoppy/hoppy.conf'
 methodsfile = sys.path[0] + '/http-methods'
 keywordsfile = sys.path[0] + '/response-keywords'
-savefile = ''
+savefilebase = ''
+savefilespider = ''
+savefileattack = ''
 verbose = 0
 fof = 0
 loopfile = ''
@@ -516,6 +535,10 @@ try:
 	text = removeHostStuff(text)
 	if not spider:
 		print2('\n\t[!] Spider is Disabled\n')
+	if savefilebase:
+		print2('\n\t[+] Saving Attack data to ' + savefileattack + '\n')
+		if spider and not loopfile:
+			print2('\n\t[+] Saving Spider data to ' + savefilespider + '\n')
 	if loopfile:
 		text = openloopfile(loopfile,text)
 	if len(text) == 0:
@@ -559,7 +582,7 @@ try:
 			testhost.send(test)
 			testhost.errors += test.summarise(keywords)
 			test.export(sys.stdout, verbose)
-			if savefile:
+			if savefilebase:
 				test.export(save, 3)
 			testhost.tests.append(test)
 	else:
@@ -589,7 +612,7 @@ try:
 
 	testhost.summary()					
 	testhost.exportSummary(sys.stdout, fof)
-	if savefile:
+	if savefilebase:
 		testhost.exportSummary(save, 1)
 
 	if testhost.errors and not fof:

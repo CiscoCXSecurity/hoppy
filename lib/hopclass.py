@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.7.2
+	Version 1.7.3
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -94,6 +94,14 @@ if not nothreading: # set up the thread class
 			self.testhost.disk.acquire() #only write to disk/screen and run processing on out own
 			try:
 				self.testhost.parseLinks(self.test.links, self.path)
+				if self.testhost.savespider:
+					self.test.export(self.testhost.savespider,3)
+					for p in self.test.links:
+						if p[0] == "/":
+							self.testhost.savespider.write('\n\t\t' + p)
+						else:
+							self.testhost.savespider.write('\n\t\t' + self.path + p)
+					self.testhost.savespider.flush()
 			finally:
    				self.testhost.disk.release() # release lock, no matter what				
 			self.testhost.pool_sema.release()   
@@ -129,6 +137,7 @@ class connection:
 		self.save = ''
 		self.actualfiles = {} # dictionary of parsed links
 		self.cookie = ''
+		self.savespider = ''
 		
 	def __finished(self, data, got, length): # check to see if we should wait for anymore data, return 0 on finish else length, -2 if chunked
 		if got > 500000: # drop out if we fetch more than 500K
@@ -141,7 +150,7 @@ class connection:
 				pass
    			return -2
 		elif length < 0 and data and data.splitlines()[0].lower().find('http') == 0: # Get Content Length
-			length = len(data.split('\r\n\r\n')[0])
+			length = len(data.split('\r\n\r\n')[0]) # remove header length from caalculation
 			for content in data.splitlines(): # process a line at a time
 				if content.lower().find('content-length') == 0:
 					hhh = content.split(':')
@@ -187,7 +196,7 @@ class connection:
 				self.actualfiles.update({l:num+1}) # update the score
 					
 			if link not in self.locations:# and link != '//':
-				if link.split(".")[-1].lower not in exclusion: # check extension
+				if link.split(".")[-1].lower() not in exclusion: # check extension
 					self.locations.append(link)
 				linkpath = os.path.dirname(link)
 				if linkpath not in self.dirs: # and len(linkpath) >1:
@@ -201,7 +210,10 @@ class connection:
 						if compbuild + "/" not in self.locations:
 							self.locations.append(compbuild + "/")	
 	def spider(self, threads): # spider method on server
-
+		
+		if self.savespider:
+			self.savespider.write('\n[+] Spider Beggining for ' + self.host + ':'  + self.port + ' with a Virtual Host of ' + self.hostname + '\n')
+			self.savespider.write("\n\t[+] Start points are  '/' and '" + self.location + "/" + self.file + "'\n")
 		if self.proxyon and not self.ssl:
 			gent = 'GET http://(realhost):(port)(location) HTTP/1.1\r\nHost: (host)\r\n(cookie)\r\n(auth)\r\n\r\n'
 		else:
@@ -228,6 +240,14 @@ class connection:
 					self.send(reqo)
 					reqo.getLinks()
 					self.parseLinks(reqo.links, path)
+					if self.savespider:
+						reqo.export(self.savespider,3)
+						for p in reqo.links:
+							if path[0] == "/":
+								self.savespider.write('\n\t\t' + p)
+							else:
+								self.savespider.write('\n\t\t' + path + p)
+						self.savespider.flush()
 
 			else: # we are threaded
 				self.disk = threading.Lock()
@@ -324,7 +344,7 @@ class connection:
 						if authmeth == 'Negotiate' and 'NTLM' not in self.authmethods: # only add one
 							self.authmethods.append('NTLM')
 						elif authmeth.lower() == 'basic' or authmeth.lower() == 'digest':
-							realm = 'Auth Realm = "' + resp.split('"')[1] + '"'
+							realm = authmeth + ' Auth Realm = "' + resp.split('"')[1] + '"'
 							if realm not in self.auth:
 								self.auth.append(realm)
 							try:
@@ -405,7 +425,7 @@ class connection:
 		timedout = 0
 		returnbuff = []
 		text = test.method
-		connecthead = 'CONNECT ' + self.host + ':' + self.port + ' HTTP/1.0\r\nHost: ' + self.hostname + ':' + self.port + '\r\n\r\n'
+		connecthead = 'CONNECT ' + self.host + ':' + self.port + ' HTTP/1.0\r\nHost: ' + self.hostname + '\r\n\r\n'
 		#connecthead = 'CONNECT ' + test.name + ' HTTP/1.1\r\nHost: ' + test.name + '\r\n\r\n'
 		text = text.replace('(host)',self.hostname) # replace the place holders
 		text = text.replace('(realhost)',self.host)
@@ -589,7 +609,7 @@ class regex:
 	host = re.compile('^(https?://)?((\S+:\S+)@)?([A-z0-9.-]+)(:(\d+))?((/\S*)?/(\S*))?', re.I)
 	host2 = re.compile('^((ftp|http|news)s?://[^/]+)?(/?[^:[*#\s>]+)', re.I)
 	dir2 = re.compile('^((/\S*)/)')
-	link = re.compile('(\s(src|href|action|location)\s*=\s*[\'"]?\s*([^>\'"]*)\s*[\'"]?)|\slocation:\s(\S*)', re.I)
+	link = re.compile('([\s|;](src|href|action|location|url)\s*=\s*[\'"]?\s*([^>\'"]*)\s*[\'"]?)|\slocation:\s(\S*)', re.I)
 
 
 	def matchip(IP):

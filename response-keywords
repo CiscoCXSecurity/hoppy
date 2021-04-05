@@ -11,7 +11,7 @@
 #																
 #
 #
-# Supplied with hoppy 1.7.2 
+# Supplied with hoppy 1.7.3 
 
 
 Allow, 0
@@ -23,9 +23,8 @@ Vary, 0
 x-vermeer-rpc,1
 The user, 2
 <a:displayname>, 1
-XSSdetect, 2
-TRACK, 1
-TRACE, 1
+<script>XSSdetect</script>, 2
+Cookie: MirroredBack, 2
 Apache, 1
 mod_ssl/, 1
 OpenSSL/, 1

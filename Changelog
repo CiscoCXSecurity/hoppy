@@ -1,3 +1,8 @@
+<1.7.3> - 22/10/2008 - Added file output to spider
+					   added clobber protection for output files
+					   modified the cecking for TRACK/TRACE more user friendly
+					   Added URL to link parser in spider
+
 <1.7.2> - 04/10/2008 - Fixed spider
 					   Added cookie header so now we can use them
 					   Fixed Problem With Basic Auth
