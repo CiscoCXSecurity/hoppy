@@ -1,0 +1,41 @@
+# This is the the keywords file for hoppy
+#			by deanx
+# format:
+#
+# Text To Match, location
+# 
+# location is either 0, 1 or 2.
+#			0 only matches the beginning of a line 
+#			1 matches anywhere 
+#			2 is for data extraction, i.e. prints method that found it!
+#																
+#
+#
+# Supplied with hoppy 1.5.7 
+
+
+Allow, 0
+Public, 0
+Location, 1
+debugging, 1
+realm, 1
+TlRMTVNTUAA, 1
+Vary, 0
+x-vermeer-rpc,1
+The user, 1
+<a:displayname>, 1
+XSSdetect, 1
+TRACK, 1
+TRACE, 1
+Apache, 1
+IIS, 1
+PHP, 1
+Server:, 0
+X-AspNet-Version, 1
+-Authenticate:, 1
+Alternates:, 0
+FPVersion=, 1
+Via:, 0
+ETag:, 0
+google, 1
+Version Information:, 1

@@ -1,0 +1,458 @@
+#!/usr/bin/python
+
+"""
+
+	[H]ttp [OP]tions Checker in [PY]thon
+
+	hoppy - a (dirty) python script to test webserver methods: 
+	 		it gets options then tests all known methods not just those returned by options
+	 		basic parsing is emplloyed to see if the server told us anything of interest
+	 			 		
+	
+	methods file contains list of methods to test and is based loosley upon the problems documented by David Litchfield:
+	
+		http://www.ngssoftware.com/papers/iisrconfig.pdf	
+			
+	Usage : hoppy -h <[http[s]://]hostname[:port]> [options]
+		
+	example: http_options.py -h www.google.com -p 80 -vv
+	
+	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
+	
+	Version 1.5.7 
+	
+	* This program is free software; you can redistribute it and/or modify
+	* it under the terms of the GNU General Public License as published by
+ 	* the Free Software Foundation; either version 2 of the License, or
+	* (at your option) any later version.
+	*
+ 	* This program is distributed in the hope that it will be useful,
+ 	* but WITHOUT ANY WARRANTY; without even the implied warranty of
+ 	* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ 	* GNU General Public License for more details.
+ 	*
+ 	* You should have received a copy of the GNU General Public License
+ 	* along with this program; if not, write to the Free Software
+ 	* Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.	
+
+"""
+
+version = '1.5.7'
+
+import socket, sys, getopt, threading
+from threading import Thread
+
+
+sys.path.append(sys.path[0] + '/lib')
+import hopclass
+
+
+class testit(Thread):
+	def __init__ (self,testhost,x):
+		Thread.__init__(self)
+		global verbose
+		self.testhost = testhost 
+		self.name, self.method = x.split(',',1)
+		self.test = hopclass.test(self.name, self.method.lstrip().rstrip())
+		if verbose:
+			print2('\n[+] Testing ' + self.test.name + ' request on ' + testhost.location + testhost.file + '\n')
+			sys.stdout.flush()
+		if self.testhost.proxyon and not self.testhost.ssl:
+			self.test.method = addProxy(test.method)
+
+	def run(self):
+		self.testhost.send(self.test)
+		self.testhost.errors += self.test.summarise(keywords)
+		self.test.export(sys.stdout, verbose)
+		if savefile:
+			self.test.export(save, 3)
+		self.testhost.tests.append(self.test)
+
+__doc__ = '\n  hoppy ' + version + ' - (C) 2007 deanx\n\n' 
+__doc__ += '\t\t\t RID[at]Portcullis-Security.com\n\n' 
+__doc__ += '  Usage: ' + sys.argv[0] +' -h <[http[s]]://hostname[:port]> [options]\n\n'
+__doc__ += '\t -h [http[s]]://]hostname[:port] [--host=]\t (required)\n'
+__doc__ += '\t -p port [--port=]\t\t\t\t (default 80)\n'
+__doc__ += '\t -l location [--location=]\t\t\t (default /images)\n'
+__doc__ += '\t -f file [--file=]\t\t\t\t (default dummy.txt)\n'
+__doc__ += '\t -o methods_file [--options=]\t\t\t (default /usr/local/share/http-methods)\n'
+__doc__ += '\t -k keywords_file [--keywords=]\t\t\t (default /usr/local/share/response-keywords)\n'
+__doc__ += '\t -r realhostname [--name=]\t\t\t (default same as hostname)\n'
+__doc__ += '\t -t port-timeout [--timeout=]\t\t\t (default 10s)\n'
+__doc__ += '\t -T max_thread_count [--threads=]\t\t (default 20)\n'
+__doc__ += '\t -a username:password [--auth=]\t\t\t (Basic Auth only)\n'
+__doc__ += '\t -C config_file [--config=] \t\t\t (Load an alternative for /etc/hoppy/hoppy.conf)\n'
+__doc__ += '\t -S file [--save=]\t\t\t\t (save output to file)\n'
+__doc__ += '\t -L file [--loop=]\t\t\t\t (loop around valid methods)\n'
+__doc__ += '\t -s [--ssl]\t\t\t\t\t (use ssl)\n'
+__doc__ += '\t -n [--nossl]\t\t\t\t\t (disable ssl, takes precedence)\n'
+__doc__ += '\t -4 [--404]\t\t\t\t\t (do not supress 404\'s, 100\'s or 400 or 000 errors)\n'
+__doc__ += '\t -N [--no-proxy]\t\t\t\t (disable proxy use, even if HTTP_PROXY is set)\n'
+__doc__ += '\t -v [--verbose]\t\t\t\t\t (be verbose, print parsed output as we go along)\n'
+__doc__ += '\t -vv \t\t\t\t\t\t (be very verbose, print server response)\n'
+__doc__ += '\t -vvv \t\t\t\t\t\t (be very very verbose, print our test and server response)\n'
+__doc__ += '\t -c [--check]\t\t\t\t\t (check the config files for errors, do nothing else)\n'
+__doc__ += '\n  To use a web proxy set the ENV vairable HTTP_PROXY to [http[s]://]proxyserver:port\n'
+
+
+def print2(text):
+	global save, savefile
+	print text,
+	if savefile:
+		save.write(text)
+		save.flush()
+
+def addProxy(text):
+	try:
+		verb, request = text.split(None, 1)
+		return verb + ' http://(realhost):(port)'  + request
+	except ValueError :
+		print '\t[!] Bad line in the methods file line ' + text + ', no proxy added\n\n'
+		return text  
+
+
+def report(result, level):
+	print "\b"+result.result,
+	sys.stdout.flush()
+
+	
+def usage(): # Self explanitory
+    print __doc__
+    
+def checkconfig(): # Check to make sure the config only conatins valid lines
+	global methodsfile, keywordsfile
+	print '\n\t[+] Checking "' + methodsfile + '" for problems'
+	text, errors = parsefile(methodsfile, 'Methods File')
+	if errors >= 1:
+		print '\n\t[!] ' + str(errors) + ' Error(s) occured while parsing file\n'
+	else:
+		print '\n\t\t[+] No errors were detected :-)\n'
+	print '\n\t[+] Checking "' + keywordsfile + '" for problems'
+	text, errorsa = parsefile(keywordsfile, 'Keywords File')
+	if errorsa >= 1:
+		print '\t[!] ' + str(errorsa) + ' Error(s) occured while parsing config file\n'
+	else:
+		print '\n\t\t[+] No errors were detected :-)\n'	
+	sys.exit(2)
+
+
+def parsecmd(argv, connection):
+	global verbose, fof, config_file, methodsfile, keywordsfile, savefile, loopfile, maxthreads
+	nossl = 0
+	portset = 0
+	check = 0
+	noproxy = 0
+
+	try:
+		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:k:4t:a:r:w:NS:L:T:", ["help","location=","file=", "host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy", "config=", "save=", "loop=", "threads="])
+	except getopt.GetoptError, e:
+		usage()
+		print '  [!] ' + str(e) + '\n'
+		sys.exit(2)
+	for opt, arg in opts:
+		if opt == '--help':
+			usage()
+			sys.exit()
+		elif opt in ("-h", "--host"):
+			connection.host = arg.lower()
+		elif opt in ("-a", "--auth"):
+			connection.addAuth(arg)
+		elif opt in ("-r", "--name"):
+			connection.hostname = arg
+		elif opt in ("-p", "--port"):
+			connection.port = arg
+			portset = 1
+		elif opt in ('-s', '--ssl'):
+			connection.ssl = 1
+		elif opt in ('-n', '--nossl'):
+			nossl = 1
+		elif opt in ('-v', '--verbose'):
+			verbose += 1
+		elif opt in ('-l', '--location'):
+			connection.location = arg
+		elif opt in ('-f', '--file'):
+			connection.file = arg
+		elif opt in ('-o', '--options'):
+			methodsfile = arg
+		elif opt in ('-k', '--keywords'):
+			keywordsfile = arg
+		elif opt in ('-c', '--check'):
+			check = 1
+		elif opt in ('--config='):
+			config_file = arg
+		elif opt in ('-4', '--404'):
+			fof = 1
+		elif opt in ('-T', '--threads'):
+			maxthreads = arg
+		elif opt in ('-t', '--timeout='):
+			connection.timeout = arg
+		elif opt in ('-N', '--no-proxy'):
+			noproxy = 1
+		elif opt in ('-S', '--save'):
+			savefile = arg
+		elif opt in ('-L', '--loop'):
+			loopfile = arg
+		
+	if check:
+		checkconfig()
+	if nossl:
+		connection.removessl()
+	if noproxy:
+		connection.removeproxy()
+	connection.checkConfig()
+	if not connection.port.isdigit() or int(connection.port) > 65535 or int(connection.port) < 1:
+		usage()
+		print '  [!] Supplied port (-p ' + connection.port + ') is not a number or out of range 1-65535\n'
+		sys.exit(2)
+	if not maxthreads.isdigit() or int(maxthreads) > 65535 or int(maxthreads) < 1:
+		usage()
+		print '  [!] Supplied thread count (-T ' + maxthreads + ') is not a number or out of range 1-65535\n'
+		sys.exit(2)
+	try:
+		connection.timeout = float(connection.timeout)
+	except:
+		usage()
+		print '  [!] Supplied timeout (-t ' + connection.timeout + ') is not valid\n'
+		sys.exit(2)
+	if not connection.host:
+		usage()
+		print '  [!] hostname (-h) is required\n'
+		sys.exit(2)
+						
+	
+def loadconfig(file): # read hoppy.conf file
+	global server, file_dir, methodsfile, keywordsfile
+	try:	# try to open the methods file
+		in_file = open(file, "r")	
+		temp = in_file.read().splitlines()
+		in_file.close()
+	except IOError, e:
+		print '\n\t[!] Couldn\'t find config file  - ' + file + ' using defaults\n'
+		return
+	for line in temp:
+		if line.find('FILE_DIR') == 0:
+			try:
+				file_dir = line.split('=',1)[1]
+				methodsfile = file_dir + '/http-methods'
+				keywordsfile = file_dir + '/response-keywords'
+			except:
+				print '\n\t[!] Config File Error check FILE_DIR value\n\n'
+		if line.find('UPDATE_SERVER') == 0:
+			try:
+				location = line.split('=',1)[1]
+			except:
+				print '\n\t[!] Config File Error check UPDATE_SERVER value\n\n'
+
+
+#def update: # update from server
+			
+def parsefile(file, name): #
+	text = []
+	errors = 0
+	try:	# try to open the methods file
+		in_file = open(file, "r")	
+		temp = in_file.read().splitlines()
+		in_file.close()
+	except IOError, e:
+		print2('\n\n\t[!] ' + name + ' problem - ' + str(e) + ', trying in CWD\n')
+		file=file.split('/')[-1]
+		print2('\n\t[+] Opening "./' + file + '"')
+		errors = errors + 1 
+		try:	# try to open the methods file
+			in_file = open(file, "r")	
+			temp = in_file.read().splitlines()
+			in_file.close()	
+			print2(' - OK') 
+		except IOError, e:
+				print2(' - ' + str(e) + ', no methods file exiting\n\n')
+				sys.exit(2)
+	for line in temp:
+		if line.find('#') == 0 or line.isspace() or len(line) == 0: # ignores comment lines and blank ones
+			continue
+		else:
+			try:
+				name, method = line.split(',', 1) # checks that two values are on each line
+			except:
+				print('\n\t[!] Bad line in config file - ' + file + '\n\n\t\t' + line + '\n')
+				errors = errors + 1
+				continue
+			text.append(line)
+	return (text,errors)
+
+def opensavefile(file): #
+	try:	# try to open the methods file
+		out_file = open(file, "w")	
+	except IOError, e:
+		print '\n\t[!] Couldn\'t create ' + file + ' for writing\n'
+		sys.exit(2)
+	return (out_file)
+	
+def openloopfile(file,text): #
+	loop = []
+	newtext = []
+	errors = 0
+	if file:
+		try:	# try to open the methods file
+			in_file = open(file, "r")	
+			temp = in_file.read().splitlines()
+			in_file.close()
+		except IOError, e:
+			print '\n\t[!] Couldn\'t find loop file  - ' + file + '\n'
+			sys.exit(2)
+		for line in temp:
+			if line.find('#') == 0 or line.isspace() or len(line) == 0: # ignores comment lines and blank ones
+				continue
+			else:
+				loop.append(line)
+		for line in text:
+			if line.find('(loop)') >= 0:
+				for lreplace in loop:
+					newtext.append(line.replace('(loop)', lreplace))
+			else:
+				newtext.append(line)
+	else:
+		for line in text:
+			if line.find('(loop)') >= 0:
+				continue
+			else:
+				newtext.append(line)			
+	return (newtext)
+		
+
+	
+def checkConnection(connection):
+	global verbose
+	head = hopclass.test('GET', 'GET (location)/(file) HTTP/1.1\r\nHost: (host):(port)\r\n\r\n')
+
+	if connection.proxyon:
+		try:
+			ipaddr = socket.gethostbyname(connection.connection[0])
+		except socket.gaierror, e:
+			(num, name) = e
+			print '\n\t[!] Host Lookup Failure - ' + name + ' ' + connection.connection[0] + ' - Check HTTP_PROXY env variable\n\n'
+			sys.exit()
+
+		print2('\n\t[+] Proxy Enabled on ' + connection.connection[0] + ':' + str(connection.connection[1]) + '\n')
+		#print2( '\n\t[+] Timout has been increased to ' + str(timeout)
+		print2('\n\t[+] Proxy Server ' + connection.connection[0] + ' resolves to ' + ipaddr + '\n')
+
+		print2('\n\t[+] Testing Proxy Connection to ' + connection.connection[0] + ':' + str(connection.connection[1]))
+
+		sys.stdout.flush()
+		if not connection.ssl:
+			connection.send(head) # does a head request to check server is there and responding
+		else:
+			connection.ssl = 0
+			connection.send(head) # does a head request to check server is there and responding
+			connection.ssl = 1
+		if len(head.result) > 1:
+			print2('\n\n\t[!] No response from the server, ' + head.result + ', maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n\n')
+			sys.exit(2)
+		else:
+			print2(' - OK Data Recieved\n')
+		sys.stdout.flush
+		head = hopclass.test('GET', 'GET (location)/(file) HTTP/1.0\r\nHost: (host):(port)\r\n\r\n')
+
+		if not connection.ssl:
+			head.method = addProxy(head.method)
+
+	try:
+		ipaddr = socket.gethostbyname(connection.host)
+	except socket.gaierror, e:
+		(num, name) = e
+		print2('\n\t[!] Host Lookup Failure - ' + name + ' ' + connection.host + ' - Check hostname (-h)\n')
+		sys.exit()
+	
+	print2('\n\t[+] Test host ' + connection.hostname + ' resolves to ' + ipaddr + '\n')
+	
+	if connection.ssl:
+		print2('\n\t[+] Testing SSL Connection to ' + connection.hostname + ':' + str(connection.port))
+	else:
+		print2('\n\t[+] Testing Connection to ' + connection.hostname + ':' + str(connection.port))
+	sys.stdout.flush()
+	connection.send(head) # does a head request to check server is there and responding
+	
+	if connection.proxyon:
+		if not head.recieved[0].splitlines(): # or len(head.recieved) == 0:
+			print2('\n\n\t[!] No response from the server, maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n')
+			sys.exit(2)		
+	elif len(head.result) > 1:
+			print2('\n\n\t[!] No response from the server, ' + head.result + ', maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n')
+			sys.exit(2)
+	print2( ' - OK Data Recieved\n')
+	sys.stdout.flush()
+	if connection.ssl:
+		print2('\n[+] Testing https://' + connection.hostname +':' + connection.port + ' [' + ipaddr + '] with '  + connection.location + '/' + connection.file + ' as webDAV location\n\n')
+	else:
+		print2('\n[+] Testing http://' + connection.hostname +':' + connection.port + ' [' + ipaddr + '] with '  + connection.location + '/' + connection.file + ' as webDAV location\n\n')
+
+	if not verbose:
+		print '\t[+] ',
+		sys.stdout.flush()
+
+
+# default option flags
+
+	
+file_dir='/usr/share'
+config_file = '/etc/hoppy/hoppy.conf'
+methodsfile = sys.path[0] + '/http-methods'
+keywordsfile = sys.path[0] + '/response-keywords'
+savefile = ''
+verbose = 0
+fof = 0
+loopfile = ''
+maxthreads = '20'
+
+# read command line and inport config files
+
+try:
+	loadconfig(config_file)
+	testhost = hopclass.connection()
+	parsecmd(sys.argv[1:], testhost)
+	if savefile:
+		save = opensavefile(savefile)
+	print2('\n[+] Configuring Test Environment')
+	text, errors = parsefile(methodsfile, 'Methods File')
+	keywords, errors2 = parsefile(keywordsfile, 'Keywords File')
+	errors = errors + errors2
+	text = openloopfile(loopfile,text)
+	if len(text) == 0:
+		print2('\n[!] No Valid Methods to Test\n\n')
+		sys.exit(2)
+	if errors == 0:
+		print2(' - Done :-)\n')
+	else:
+		print2('\n\n\t[+] Configuration files Sucesfully Loaded\n')
+
+	print2('\n[+] Initialising Connection\n')
+	checkConnection(testhost)	 
+except KeyboardInterrupt:
+	sys.exit(2)
+try:
+	pool_sema = threading.BoundedSemaphore(int(maxthreads))
+	for x in text:			# test methods from file
+		pool_sema.acquire()
+		current = testit(testhost, x)
+		current.start()
+		pool_sema.release()		
+	while (threading.activeCount() > 1):
+		pass
+
+	if not verbose:
+		print2('\n\n\t[+] Done :-)')
+except KeyboardInterrupt:
+	pass
+testhost.summary()					
+testhost.exportSummary(sys.stdout, fof)
+if savefile:
+	testhost.exportSummary(save, 1)
+
+if testhost.errors and not fof:
+	print2('\n\t[+] ' + str(testhost.errors) + ' check(s) failed to return data, try incrreasing the socket timeout (-t) and re-run with the -4 switch for more information\n\n')
+sys.exit()
+
+
+
+
+
