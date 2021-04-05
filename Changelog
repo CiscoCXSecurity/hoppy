@@ -1,3 +1,5 @@
+<1.5.8> - 03/04/2008 - fixed a bug with the check done when settign a port number
+
 <1.5.7> - 29/02/2008 - fixed bug in finding http-methods file if installed into a firrerent location
 		     - on the 29th just because i could
 

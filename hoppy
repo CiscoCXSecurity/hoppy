@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.5.7 
+	Version 1.5.8 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 """
 
-version = '1.5.7'
+version = '1.5.8'
 
 import socket, sys, getopt, threading
 from threading import Thread
@@ -142,7 +142,6 @@ def parsecmd(argv, connection):
 	portset = 0
 	check = 0
 	noproxy = 0
-
 	try:
 		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:k:4t:a:r:w:NS:L:T:", ["help","location=","file=", "host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy", "config=", "save=", "loop=", "threads="])
 	except getopt.GetoptError, e:
@@ -160,7 +159,7 @@ def parsecmd(argv, connection):
 		elif opt in ("-r", "--name"):
 			connection.hostname = arg
 		elif opt in ("-p", "--port"):
-			connection.port = arg
+			port = arg
 			portset = 1
 		elif opt in ('-s', '--ssl'):
 			connection.ssl = 1
@@ -199,11 +198,14 @@ def parsecmd(argv, connection):
 		connection.removessl()
 	if noproxy:
 		connection.removeproxy()
+	if portset:
+		if not port.isdigit() or int(port) > 65535 or int(port) < 1:
+			usage()
+			print '  [!] Supplied port (-p ' + port + ') is not a number or out of range 1-65535\n'
+			sys.exit(2)
+		connection.port = port
 	connection.checkConfig()
-	if not connection.port.isdigit() or int(connection.port) > 65535 or int(connection.port) < 1:
-		usage()
-		print '  [!] Supplied port (-p ' + connection.port + ') is not a number or out of range 1-65535\n'
-		sys.exit(2)
+
 	if not maxthreads.isdigit() or int(maxthreads) > 65535 or int(maxthreads) < 1:
 		usage()
 		print '  [!] Supplied thread count (-T ' + maxthreads + ') is not a number or out of range 1-65535\n'
@@ -218,7 +220,7 @@ def parsecmd(argv, connection):
 		usage()
 		print '  [!] hostname (-h) is required\n'
 		sys.exit(2)
-						
+		
 	
 def loadconfig(file): # read hoppy.conf file
 	global server, file_dir, methodsfile, keywordsfile
