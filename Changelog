@@ -1,3 +1,13 @@
+<1.7.2> - 04/10/2008 - Fixed spider
+					   Added cookie header so now we can use them
+					   Fixed Problem With Basic Auth
+					   Modified PUT/DELETE Methid check to be safer
+					   Fixed (again) the length claculation on the recieved data
+
+<1.7.1> - 30/09/2008 - Added parsing to extract basic/digest auth realm
+					   broke spider
+					   this relese was never made public cause of above
+
 <1.7.0> - 12/09/2008 - Added spider to general scanning to test for webdav on many directories
 					   Fixed bugs with regex matching
 					   Improved Handling of chunked server responces
@@ -5,7 +15,8 @@
 					   Made the spider threaded
 					   Removed {extract} from verbose output
 					   added colour highlighting for data matching
-					   truncate line for path leakage improved 
+					   truncate line for path leakage improved
+					   added more syntax highlighting 
 					  
 <1.6.4> - 21/08/2008 - Fixed bug with new host stuff as I forgot number is the regex
 

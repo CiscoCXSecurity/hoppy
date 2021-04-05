@@ -11,7 +11,7 @@
 #																
 #
 #
-# Supplied with hoppy 1.7.0 
+# Supplied with hoppy 1.7.2 
 
 
 Allow, 0
@@ -27,8 +27,11 @@ XSSdetect, 2
 TRACK, 1
 TRACE, 1
 Apache, 1
+mod_ssl/, 1
+OpenSSL/, 1
+DAV/, 1
+php/, 1 
 IIS, 1
-PHP, 1
 Server:, 0
 X-AspNet-Version, 1
 Alternates:, 0
@@ -43,3 +46,4 @@ X-Powered-By, 0
 MicrosoftSharePointTeamServices, 0
 allow-access-from, 2
 multistatus, 2
+X-MSDAVEXT_Error:, 2

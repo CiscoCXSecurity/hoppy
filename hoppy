@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.7.0 
+	Version 1.7.2 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 """
 
-version = '1.7.0'
+version = '1.7.2'
 
 import socket, sys, getopt, time, os
 
@@ -95,11 +95,12 @@ __doc__ += '\t -l location [--location=]\t\t\t (default /images)\n'
 __doc__ += '\t -f file [--file=]\t\t\t\t (default dummy.txt)\n'
 __doc__ += '\t -o methods_file [--options=]\t\t\t (default /usr/local/share/http-methods)\n'
 __doc__ += '\t -k keywords_file [--keywords=]\t\t\t (default /usr/local/share/response-keywords)\n'
+__doc__ += '\t -C cookie [--cookie=] \t\t\t\t (add a cookie to the reqests we make)\n'
 __doc__ += '\t -r realhostname [--name=]\t\t\t (default same as hostname)\n'
 __doc__ += '\t -t port-timeout [--timeout=]\t\t\t (default 10s)\n'
 __doc__ += '\t -T max_thread_count [--threads=]\t\t (default 20)\n'
 __doc__ += '\t -a username:password [--auth=]\t\t\t (Basic Auth only)\n'
-__doc__ += '\t -C config_file [--config=] \t\t\t (Load an alternative for /etc/hoppy/hoppy.conf)\n'
+__doc__ += '\t -F config_file [--config=] \t\t\t (Load an alternative for /etc/hoppy/hoppy.conf)\n'
 __doc__ += '\t -S file [--save=]\t\t\t\t (save output to file)\n'
 __doc__ += '\t -L file [--loop=]\t\t\t\t (loop around valid methods)\n'
 __doc__ += '\t -A [--apponly]\t\t\t\t\t (disable the host checks)\n'
@@ -165,7 +166,7 @@ def parsecmd(argv, connection):
 	hset = 0
 	auth = ''
 	try:
-		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:H:k:4At:a:r:NS:L:T:E", ["help","location=","file=", "host=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy","apponly", "config=", "save=", "loop=", "threads=", "nospider"])
+		opts, args = getopt.getopt(argv, "h:p:scnvl:f:F:o:H:k:4At:C:a:r:NS:L:T:E", ["help","location=","file=", "host=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "cookie=", "timeout=", "auth=", "name=", "no-proxy","apponly", "config=", "save=", "loop=", "threads=", "nospider"])
 	except getopt.GetoptError, e:
 		usage()
 		print '\n\t[!] ' + str(e) + '\n'
@@ -202,8 +203,10 @@ def parsecmd(argv, connection):
 			keywordsfile = arg
 		elif opt in ('-c', '--check'):
 			check = 1
-		elif opt in ('--config='):
+		elif opt in ('-F', '--config='):
 			config_file = arg
+		elif opt in ('-C', '--cookie='):
+			connection.cookie = arg
 		elif opt in ('-4', '--404'):
 			fof = 1
 		elif opt in ('-T', '--threads'):

@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.7.0
+	Version 1.7.2
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -90,9 +90,10 @@ if not nothreading: # set up the thread class
 
 			self.testhost.send(self.test)
 			self.test.getLinks()
+			#self.test.export(sys.stdout, 3)
 			self.testhost.disk.acquire() #only write to disk/screen and run processing on out own
 			try:
-			 self.testhost.parseLinks(self.test.links, self.path)
+				self.testhost.parseLinks(self.test.links, self.path)
 			finally:
    				self.testhost.disk.release() # release lock, no matter what				
 			self.testhost.pool_sema.release()   
@@ -127,6 +128,7 @@ class connection:
 		self.dirs = ["/"]
 		self.save = ''
 		self.actualfiles = {} # dictionary of parsed links
+		self.cookie = ''
 		
 	def __finished(self, data, got, length): # check to see if we should wait for anymore data, return 0 on finish else length, -2 if chunked
 		if got > 500000: # drop out if we fetch more than 500K
@@ -139,11 +141,12 @@ class connection:
 				pass
    			return -2
 		elif length < 0 and data and data.splitlines()[0].lower().find('http') == 0: # Get Content Length
+			length = len(data.split('\r\n\r\n')[0])
 			for content in data.splitlines(): # process a line at a time
 				if content.lower().find('content-length') == 0:
 					hhh = content.split(':')
 					try:
-						length = int(hhh[1]) # assign the content length
+						length = length + int(hhh[1]) # assign the content length
 					except ValueError: # need this but not sure why had an error during testing but clause never met, thinks it a thread thing
 						pass
 					#print 'found length ' + str(length) + ' got so far ' + str(got) 
@@ -161,7 +164,7 @@ class connection:
 			self.save.flush()
 	
 	def parseLinks(self, links, path): # check for unique links 
-		for link in links: 
+		for link in links:
 			if link[-1] == '/' and len(link) > 1: # are we a directory?
 				end = '/'
 			else:
@@ -170,8 +173,9 @@ class connection:
 			if link[0] == '/': # are we relative?
 				link = os.path.normpath(link) + end
 			else:
+				#print path + " ! " + link
 				link = os.path.normpath(path + link) + end
-			
+				
 			if len(self.locations) > 1000: # or we have toooo many links anyhow
 				break
 			
@@ -182,7 +186,7 @@ class connection:
 					break
 				self.actualfiles.update({l:num+1}) # update the score
 					
-			if link not in self.locations: # and link != '//':
+			if link not in self.locations:# and link != '//':
 				if link.split(".")[-1].lower not in exclusion: # check extension
 					self.locations.append(link)
 				linkpath = os.path.dirname(link)
@@ -194,13 +198,14 @@ class connection:
 						if compbuild not in self.dirs:
 							self.dirs.append(compbuild)
 							self.print2("\n\t\t" + compbuild + "/")
-	
+						if compbuild + "/" not in self.locations:
+							self.locations.append(compbuild + "/")	
 	def spider(self, threads): # spider method on server
 
 		if self.proxyon and not self.ssl:
-			gent = 'GET http://(realhost):(port)(location) HTTP/1.1\r\nHost: (host)\r\n(auth)\r\n\r\n'
+			gent = 'GET http://(realhost):(port)(location) HTTP/1.1\r\nHost: (host)\r\n(cookie)\r\n(auth)\r\n\r\n'
 		else:
-			gent = 'GET (location) HTTP/1.1\r\nHost: (host)\r\n(auth)\r\n\r\n'
+			gent = 'GET (location) HTTP/1.1\r\nHost: (host)\r\n(cookie)\r\n(auth)\r\n\r\n'
 
 		# parse the output and get out all links
 		# add full file + path to location and dirs to dirs if not it etc...
@@ -300,7 +305,7 @@ class connection:
 		if len(self.auth) > 0: 
 			file.write('\n\n\t[+] AUTH Leakage:\n')	
 			for data in self.auth:
-				file.write('\n\t\tBase64 Decode: ' + data)
+				file.write('\n\t\t' + data)
 		if len(self.extract) > 0: # print extracted data
 			file.write('\n\n\t[+] Extracted Data:\n')	
 			for data in self.extract:
@@ -311,18 +316,27 @@ class connection:
 		for job in self.tests:
 			for resp in job.summary:
 				resp = resp.strip()	# Find all matching headers and print once
-				auth = 0 
+				authed = 0 
 				if resp.lower().find('www-authenticate') == 0 or resp.lower().find('proxy-authenticate') == 0: # bas64decode the NTLM header
-					auth = 1
+					authed = 1
 					authmeth = resp.split()[1]
 					if authmeth not in self.authmethods: 
 						if authmeth == 'Negotiate' and 'NTLM' not in self.authmethods: # only add one
 							self.authmethods.append('NTLM')
+						elif authmeth.lower() == 'basic' or authmeth.lower() == 'digest':
+							realm = 'Auth Realm = "' + resp.split('"')[1] + '"'
+							if realm not in self.auth:
+								self.auth.append(realm)
+							try:
+								self.authmethods.append(authmeth)
+							except IndexError:
+								pass	
 						elif authmeth != 'Negotiate':	# add all others
 							self.authmethods.append(authmeth)
 					try:
 						all = resp.split()[2] # try to extract machine/domain data
 						machine = base64.b64decode(all)[56:] # only get a bit of the string
+						machine = 'NTLM Info "' + machine + '"'
 						if machine not in self.auth and all[:5] == "TlRMT": # we got a good decode
 							self.auth.append(machine)			 # Append leak text
 					except TypeError:
@@ -338,7 +352,7 @@ class connection:
 					self.pathleak.append(resp)
 				if resp not in self.ipleak and regex.matchip(resp): # append ip leakage
 					self.ipleak.append(resp)
-				if not auth and resp not in self.leak and resp not in self.ipleak and resp not in self.pathleak and resp not in self.extract and resp not in self.auth:
+				if not authed and resp not in self.leak and resp not in self.ipleak and resp not in self.pathleak and resp not in self.extract and resp not in self.auth:
 					self.leak.append(resp) # append other stuff
 		self.leak.sort()	
 	
@@ -398,9 +412,14 @@ class connection:
 		text = text.replace('(port)',self.port)
 		text = text.replace('\\n','\r\n')
 		if self.b64auth:
-			text = text.replace('(auth)','Authorization: Basic ' + self.b64auth)
+			text = text.replace('(auth)\r\n','Authorization: Basic ' + self.b64auth)
 		else:
 			text = text.replace('(auth)\r\n','')
+		if self.cookie:
+			text = text.replace('(cookie)','Cookie: ' + self.cookie)
+		else:
+			text = text.replace('(cookie)\r\n','')
+
 		text = text.replace('(location)',self.location)
 		text = text.replace('(file)',self.file)
 		split = text.split('(wait)')
@@ -570,7 +589,7 @@ class regex:
 	host = re.compile('^(https?://)?((\S+:\S+)@)?([A-z0-9.-]+)(:(\d+))?((/\S*)?/(\S*))?', re.I)
 	host2 = re.compile('^((ftp|http|news)s?://[^/]+)?(/?[^:[*#\s>]+)', re.I)
 	dir2 = re.compile('^((/\S*)/)')
-	link = re.compile('((src|href|action|location)\s*=\s*[\'"]?\s*([^>\'"]*)\s*[\'"]?)|location:\s(\S*)', re.I)
+	link = re.compile('(\s(src|href|action|location)\s*=\s*[\'"]?\s*([^>\'"]*)\s*[\'"]?)|\slocation:\s(\S*)', re.I)
 
 
 	def matchip(IP):
