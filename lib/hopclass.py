@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.7.3
+	Version 1.8.1
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -31,8 +31,15 @@
 
 import socket, re, base64, os, sys
 
+six = 1
+try:
+	import ssl
+except ImportError, e:
+	six = 0
 
-exclusion = [ "gif", "jpeg", "jpg", "jpe", "png", "vis", "tif", "tiff", "psd", "bmp", "ief", "wbmp", "ras", "pnm", "pbm", "pgm", "ppm", "rgb", "xbm", "xpm", "xwd", "djv", "djvu", "iw4", "iw44", "fif", "ifs", "dwg", "svf", "wi", "uff", "mpg", "mov", "mpeg", "mpeg2", "avi", "asf", "asx", "wmv", "qt", "movie", "ice", "viv", "vivo", "fvi", "tar", "tgz", "gz", "zip", "jar", "cab", "hqx", "arj", "rar", "rpm", "ace", "wav", "vox", "ra", "rm", "ram", "wma", "au", "snd", "mid", "midi", "kar", "mpga", "mp2", "mp3", "mp4", "aif", "aiff", "aifc", "es", "esl", "pac", "pae", "a3c", "pdf", "doc", "xls", "ppt", "mp", "msi", "rmf", "smi", "bin", "ps", "eps"] # array conating those extensions that we shoud not get when spidering
+
+
+exclusion = [ "gif", "jpeg", "jpg", "jpe", "png", "vis", "tif", "tiff", "psd", "bmp", "ief", "wbmp", "ras", "pnm", "pbm", "pgm", "ppm", "rgb", "xbm", "xpm", "xwd", "djv", "djvu", "iw4", "iw44", "fif", "ifs", "dwg", "svf", "wi", "uff", "mpg", "mov", "mpeg", "mpeg2", "avi", "asf", "asx", "wmv", "qt", "movie", "ice", "viv", "vivo", "fvi", "tar", "tgz", "gz", "zip", "jar", "cab", "hqx", "arj", "rar", "rpm", "ace", "wav", "vox", "ra", "rm", "ram", "wma", "au", "snd", "mid", "midi", "kar", "mpga", "mp2", "mp3", "mp4", "aif", "aiff", "aifc", "es", "esl", "pac", "pae", "a3c", "pdf", "doc", "xls", "ppt", "mp", "msi", "rmf", "smi", "bin", "ps", "eps", "exe"] # array conating those extensions that we shoud not get when spidering
 
 def higlightip(message): # function to highlight IP addresses
 	messageip = regex.ip2.search(message).group()
@@ -52,7 +59,7 @@ def highlightpath(message): # function to highlight internal paths
 		if beg < 0:
 			beg = 0
 		end = beg + 130
-		return massage[beg:end]
+		return message[beg:end]
 	return message
 
 def highlightkey(message, key):
@@ -138,8 +145,11 @@ class connection:
 		self.actualfiles = {} # dictionary of parsed links
 		self.cookie = ''
 		self.savespider = ''
+		self.savesummary = ''
+		self.depth = 10
 		
 	def __finished(self, data, got, length): # check to see if we should wait for anymore data, return 0 on finish else length, -2 if chunked
+		header = 0
 		if got > 500000: # drop out if we fetch more than 500K
 			return 0
 		if data.lower().find('transfer-encoding: chunked') >= 0 or length == -2: # Dirty!
@@ -150,19 +160,23 @@ class connection:
 				pass
    			return -2
 		elif length < 0 and data and data.splitlines()[0].lower().find('http') == 0: # Get Content Length
-			length = len(data.split('\r\n\r\n')[0]) # remove header length from caalculation
+			header = len(data.split('\r\n\r\n')[0]) # remove header length from caalculation
 			for content in data.splitlines(): # process a line at a time
 				if content.lower().find('content-length') == 0:
 					hhh = content.split(':')
 					try:
-						length = length + int(hhh[1]) # assign the content length
+						length = header + int(hhh[1]) # assign the content length
 					except ValueError: # need this but not sure why had an error during testing but clause never met, thinks it a thread thing
 						pass
+                                        except IndexError: # need this but not sure why had an error during testing but clause never met, thinks it a thread thing
+                                                pass
 					#print 'found length ' + str(length) + ' got so far ' + str(got) 
 					break
+				elif data.find('\r\n\r\n') < 0: # have we got the whol header
+					length = -3 # content length not in header
 		if (length > 0 and got < length): # detect if we have downloaded less than the content length
-			return length
-		if not data or len(data.splitlines()[-1]) == 0 or (length > 0 and got > length): # have we finished then?
+			return length			
+		if not data or (len(data[header-1:].splitlines()[-1]) == 0 and (header+4) < len(data)) or (length > 0 and got > length): # have we finished then?
 			return 0
 		return length
 	
@@ -171,6 +185,8 @@ class connection:
 		if self.save:
 			self.save.write(text)
 			self.save.flush()
+			self.savesummary.write(text)
+			self.savesummary.flush()
 	
 	def parseLinks(self, links, path): # check for unique links 
 		for link in links:
@@ -184,10 +200,8 @@ class connection:
 			else:
 				#print path + " ! " + link
 				link = os.path.normpath(path + link) + end
-				
-			if len(self.locations) > 1000: # or we have toooo many links anyhow
-				break
-			
+			if link.count('/') > int(self.depth) + 1:# self.depth:
+				continue			
 			l =  link.split('?')[0] # make sure we are not recursivly getting session based gets
 			if link != l: 
 				num = self.actualfiles.get(l, 0)
@@ -198,7 +212,7 @@ class connection:
 			if link not in self.locations:# and link != '//':
 				if link.split(".")[-1].lower() not in exclusion: # check extension
 					self.locations.append(link)
-				linkpath = os.path.dirname(link)
+				linkpath = os.path.dirname(link.split('?')[0]) # extract dir less the get information
 				if linkpath not in self.dirs: # and len(linkpath) >1:
 					comp = linkpath.split('/')
 					compbuild = ''
@@ -208,7 +222,8 @@ class connection:
 							self.dirs.append(compbuild)
 							self.print2("\n\t\t" + compbuild + "/")
 						if compbuild + "/" not in self.locations:
-							self.locations.append(compbuild + "/")	
+							self.locations.append(compbuild + "/")
+								
 	def spider(self, threads): # spider method on server
 		
 		if self.savespider:
@@ -232,11 +247,13 @@ class connection:
 			if threads == 1: # non threaded run
 				visited = 0
 				for loc in self.locations:
+					if len(self.locations) > 1000: # or we have toooo many links anyhow
+						break
 					path = os.path.dirname(loc) + "/"
 					if path == '//':
 						path = '/'
 					req = gent.replace('(location)',loc)
-					reqo = test('GET', req)
+					reqo = test('GET','X', req)
 					self.send(reqo)
 					reqo.getLinks()
 					self.parseLinks(reqo.links, path)
@@ -254,19 +271,23 @@ class connection:
 				self.pool_sema = threading.BoundedSemaphore(threads)
 				visited = 0
 				while len(self.locations) > visited: # need to wait till all threads are done before we decide if we have finished
+					if len(self.locations) > 10000: # or we have toooo many links anyhow
+						while (threading.activeCount() > 1):
+							pass	
+						break
 					for loc in self.locations[visited:]:			# test methods from file
 						path = os.path.dirname(loc) + "/"
 						if path == '//':
 							path = '/'
 						req = gent.replace('(location)',loc) # build new request
-						reqo = test('GET', req)
+						reqo = test('GET','X', req)
 						self.pool_sema.acquire() # block till we have a new thread
 						current = testit(self, reqo, path)
+						#current.setDaemon()
 						current.start() # non blocking start to threads
 						visited += 1
 					while (threading.activeCount() > 1):
-						pass
-											
+						pass							
 			if len(self.dirs) > 0:
 				self.print2("\n\n\t[+] Spider Completed :-)")
 				self.print2("\n\n\t[+] Found " + str(len(self.dirs)-1) + " directories for testing\n")
@@ -292,7 +313,8 @@ class connection:
 	def exportSummary(self, file, fof): # print the summary 
 		file.write('\n\n[+] Summary of Findings\n')
 		types = []
-		ignorecodes = [404, 100, 000, 301, 400]		
+		ignorecodes = [404, 100, 000, 301, 400]
+		interesting = []		
 
 		for check in self.tests:
 			for rescode in check.resline:
@@ -300,10 +322,19 @@ class connection:
 					if not (ignorecodes.count(rescode[0]) or check.name[:4] == "Info") or fof: # are we -4 or not ignoring it
 						#sys.stdout.flush()
 						types.append(check.name + ',' + rescode[1])
-		if len(types) > 0: # print method repsonces
-			types.sort()
+					if str(rescode[0]) == check.interesting:
+						interesting.append(check.name + ',' + rescode[1])
+						
+		types.sort()
+		interesting.sort()
+		if len(types) > 0:
 			file.write('\n\t[+] Method Responses:\n')
 			for data in types:
+				name, got = data.split(',', 1)
+				file.write('\n\t\t%-25s -\t %s' % (name, got))
+		if len(interesting) > 0:
+			file.write('\n\n\t[+] Interesting Method Responses:\n')
+			for data in interesting:
 				name, got = data.split(',', 1)
 				file.write('\n\t\t%-25s -\t %s' % (name, got))
 		if len(self.leak) > 0: # print infrmation leakage
@@ -344,19 +375,19 @@ class connection:
 						if authmeth == 'Negotiate' and 'NTLM' not in self.authmethods: # only add one
 							self.authmethods.append('NTLM')
 						elif authmeth.lower() == 'basic' or authmeth.lower() == 'digest':
-							realm = authmeth + ' Auth Realm = "' + resp.split('"')[1] + '"'
-							if realm not in self.auth:
-								self.auth.append(realm)
 							try:
 								self.authmethods.append(authmeth)
+								realm = authmeth + ' Auth Realm = "' + resp.split('"')[1] + '"'
+								if realm not in self.auth:
+									self.auth.append(realm)
 							except IndexError:
 								pass	
 						elif authmeth != 'Negotiate':	# add all others
 							self.authmethods.append(authmeth)
 					try:
 						all = resp.split()[2] # try to extract machine/domain data
-						machine = base64.b64decode(all)[56:] # only get a bit of the string
-						machine = 'NTLM Info "' + machine + '"'
+						machine = unicode(base64.b64decode(all)[56:], 'utf-8', 'replace') # only get a bit of the string
+						machine = 'NTLM Info "' + machine.encode('ascii', 'replace') + '"'
 						if machine not in self.auth and all[:5] == "TlRMT": # we got a good decode
 							self.auth.append(machine)			 # Append leak text
 					except TypeError:
@@ -387,7 +418,6 @@ class connection:
 		self.noproxy = 1
 		
 	def checkConfig(self):
-		
 		h = regex.host.match(self.host) # extract the information from the passed -h flag
 		protocol = h.group(1)
 		auth = h.group(3)
@@ -407,7 +437,9 @@ class connection:
 		if location:
 			self.location = location
 		if file:
-			self.file = file	
+			self.file = file
+			if not location:
+				self.location = '/'	
 		self.host = host
 				
 		if self.port == str(443) and not self.nossl:
@@ -419,7 +451,6 @@ class connection:
 				self.port = '443'
 			else:	
 				self.port = '80'	
-			
 		
 	def send(self, test): # send the test
 		timedout = 0
@@ -440,8 +471,6 @@ class connection:
 		else:
 			text = text.replace('(cookie)\r\n','')
 
-		text = text.replace('(location)',self.location)
-		text = text.replace('(file)',self.file)
 		split = text.split('(wait)')
 		test.sent = split
 		data = ''
@@ -453,9 +482,11 @@ class connection:
 				if self.proxyon:
 					s.send(connecthead)
 					data = s.recv(8192)
-				ssl_sock = socket.ssl(s)
+				if six:
+					ssl_sock = ssl.wrap_socket(s)
+				else :
+					ssl_sock = socket.ssl(s) #, certfile="cert.pem", keyfile="key.pem")
 				for line in split: # if we a re multi stage request then send all of them
-					timedout = 0
 					ssl_sock.write(line)
 					s.settimeout(self.timeout)
 					total_data = []
@@ -464,10 +495,15 @@ class connection:
 						try:
 							data = ssl_sock.read()
 						except socket.error:
-							#print 'timeout'
+							timedout = 1
+							break
+						except socket.sslerror:
 							break
 						total_data.append(data)
-						length = self.__finished(data, len(''.join(total_data)), length) # detect a finished connection
+						if length == -3:
+							length = self.__finished(''.join(total_data), len(''.join(total_data)), length) # detect a finished connection
+						else:
+							length = self.__finished(data, len(''.join(total_data)), length) # detect a finished connection
 						#print length
 						if not length:
 							break
@@ -487,7 +523,10 @@ class connection:
 							timedout = 1
 							break
 						total_data.append(data)					
-						length = self.__finished(data, len(''.join(total_data)), length) # detect a finished conection
+						if length == -3:
+							length = self.__finished(''.join(total_data), len(''.join(total_data)), length) # detect a finished connection
+						else:
+							length = self.__finished(data, len(''.join(total_data)), length) # detect a finished connection
 						#print length
 						if not data or not length:
 							break
@@ -507,7 +546,7 @@ class connection:
 
 class test: # test class
 
-	def __init__(self, name, method): 
+	def __init__(self, name, interesting, method): 
 		self.name = name
 		self.method	= method
 		self.recieved = ''
@@ -516,6 +555,7 @@ class test: # test class
 		self.resline = []
 		self.summary = []
 		self.links = []
+		self.interesting = interesting
 	
 	
 	def summarise(self, keywords): # parse the repsonce and extract the data we want
@@ -549,7 +589,7 @@ class test: # test class
 										self.summary.append(highlightkey(x, name))
 				else: # we got no data back so something went wrong!
 					self.resline.append([000,'HTTP/1.1 000 This Test Falied!'])
-					return 1
+			return 1
 		return 0
 		
 

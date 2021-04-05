@@ -11,7 +11,7 @@
 #																
 #
 #
-# Supplied with hoppy 1.7.3 
+# Supplied with hoppy 1.8.1 
 
 
 Allow, 0
@@ -21,7 +21,6 @@ debugging, 1
 realm, 1
 Vary, 0
 x-vermeer-rpc,1
-The user, 2
 <a:displayname>, 1
 <script>XSSdetect</script>, 2
 Cookie: MirroredBack, 2
@@ -46,3 +45,4 @@ MicrosoftSharePointTeamServices, 0
 allow-access-from, 2
 multistatus, 2
 X-MSDAVEXT_Error:, 2
+<li>msg=, 2

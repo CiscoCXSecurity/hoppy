@@ -1,3 +1,23 @@
+<1.8.1> - 30/09/2009 - Added depths limits to spider (new flag -d)
+					   Added support for python 2.6 withou a deprecated ssl warning.
+					   Fixed Proxyport issue
+ 
+
+
+<1.8.0-rcX> - N/A - Added Interesting methods parsing
+					Summary output is saved in .summary file when -S is called
+					Command line now printed in output
+					Date/Time of test added to output
+					Added depths limits to spider (new flag -d)
+					Fixed proxy port with / at the end causing a problem
+					Fixed bug with (location) / (loop) in http-methos
+					Fixed response retrieval bug if Content-Length does not have a number after it!
+					Better handling of unicode from NTLM host name
+					  
+<1.7.4> - 22/10/2008 - Added SSL/TLS exception handler for python 2.3 users.
+					   Fixed Bug when hitting a basic/digest auth page without a realm
+					   Fixed bug with path extraction (spenlt message correctly rather than massge) 
+
 <1.7.3> - 22/10/2008 - Added file output to spider
 					   added clobber protection for output files
 					   modified the cecking for TRACK/TRACE more user friendly

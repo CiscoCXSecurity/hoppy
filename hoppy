@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.7.3 
+	Version 1.8.1 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 """
 
-version = '1.7.3'
+version = '1.8.1'
 
 import socket, sys, getopt, time, os
 
@@ -59,8 +59,8 @@ if not nothreading:
 			Thread.__init__(self)
 			global verbose
 			self.testhost = testhost 
-			self.name, self.method = x.split(',',1)
-			self.test = hopclass.test(self.name, self.method.lstrip().rstrip())
+			self.name, self.interesting, self.method = x.split(',',2)
+			self.test = hopclass.test(self.name,self.interesting.lstrip().rstrip(), self.method.lstrip().rstrip())
 			if self.testhost.proxyon and not self.testhost.ssl:
 				self.test.method = addProxy(self.test.method)
 		
@@ -80,6 +80,7 @@ if not nothreading:
 				disk.acquire()
 				try:
 					self.test.export(save, 3)
+					self.test.export(savesummary, 0)
 				finally:
    					disk.release() # release lock, no matter what				
 			self.testhost.tests.append(self.test)
@@ -103,6 +104,7 @@ __doc__ += '\t -a username:password [--auth=]\t\t\t (Basic Auth only)\n'
 __doc__ += '\t -F config_file [--config=] \t\t\t (Load an alternative for /etc/hoppy/hoppy.conf)\n'
 __doc__ += '\t -S file [--save=]\t\t\t\t (save output to file)\n'
 __doc__ += '\t -L file [--loop=]\t\t\t\t (loop around valid methods)\n'
+__doc__ += '\t -d depth [--depth]\t\t\t\t (spider link depth, default 10)\n'
 __doc__ += '\t -A [--apponly]\t\t\t\t\t (disable the host checks)\n'
 __doc__ += '\t -E [--nospider]\t\t\t\t (disable the auto spider)\n'
 __doc__ += '\t -s [--ssl]\t\t\t\t\t (use ssl)\n'
@@ -117,11 +119,13 @@ __doc__ += '\n  To use a web proxy set the ENV vairable HTTP_PROXY to [http[s]:/
 
 
 def print2(text):
-	global save, savefile
+	global save, savefilebase, savesummary
 	print text,
 	if savefilebase:
 		save.write(text)
 		save.flush()
+		savesummary.write(text)
+		savesummary.flush()
 
 def addProxy(text):
 	try:
@@ -143,13 +147,13 @@ def usage(): # Self explanitory
 def checkconfig(): # Check to make sure the config only conatins valid lines
 	global methodsfile, keywordsfile
 	print '\n\t[+] Checking "' + methodsfile + '" for problems'
-	text, errors = parsefile(methodsfile, 'Methods File')
+	text, errors = parsefile(methodsfile, 'Methods File', 3)
 	if errors >= 1:
 		print '\n\t[!] ' + str(errors) + ' Error(s) occured while parsing file\n'
 	else:
 		print '\n\t\t[+] No errors were detected :-)\n'
 	print '\n\t[+] Checking "' + keywordsfile + '" for problems'
-	text, errorsa = parsefile(keywordsfile, 'Keywords File')
+	text, errorsa = parsefile(keywordsfile, 'Keywords File', 2)
 	if errorsa >= 1:
 		print '\t[!] ' + str(errorsa) + ' Error(s) occured while parsing config file\n'
 	else:
@@ -158,15 +162,16 @@ def checkconfig(): # Check to make sure the config only conatins valid lines
 
 
 def parsecmd(argv, connection):
-	global verbose, fof, config_file, methodsfile, keywordsfile, savefilebase, savefilespider, savefileattack, loopfile, maxthreads, nothreading, host, save, spider
+	global verbose, fof, config_file, methodsfile, keywordsfile, savefilebase, savefilespider, savefileattack, loopfile, maxthreads, nothreading, host, save, spider, savesummary, savefilesummary, file, location
 	nossl = 0
 	portset = 0
 	check = 0
 	noproxy = 0
 	hset = 0
 	auth = ''
+	depth = ''
 	try:
-		opts, args = getopt.getopt(argv, "h:p:scnvl:f:F:o:H:k:4At:C:a:r:NS:L:T:E", ["help","location=","file=", "host=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "cookie=", "timeout=", "auth=", "name=", "no-proxy","apponly", "config=", "save=", "loop=", "threads=", "nospider"])
+		opts, args = getopt.getopt(argv, "h:p:scnvl:f:F:o:H:k:4At:C:a:r:NS:L:T:Ed:", ["help","location=","file=", "host=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "cookie=", "timeout=", "auth=", "name=", "no-proxy","apponly", "config=", "save=", "loop=", "threads=", "nospider", "depth="])
 	except getopt.GetoptError, e:
 		usage()
 		print '\n\t[!] ' + str(e) + '\n'
@@ -222,20 +227,31 @@ def parsecmd(argv, connection):
 		elif opt in ('-A', '--apponly'):
 			loopfile = arg
 			host = 0
+		elif opt in ('-d', '--depth'):
+			depth = arg
 		elif opt in ('-H', '--Host'):
 			host = 0
 			connection.host = arg
 			hset = hset + 1
+	if check:
+		checkconfig()
 	if savefilebase: # need to finished coding of spider output
 		suf = findnextfile(savefilebase)
 		savefileattack = savefilebase + ".attack" + suf
 		save = opensavefile(savefileattack)
+		savefilesummary = savefilebase + ".summary" + suf
+		savesummary = opensavefile(savefilesummary)
 		connection.save = save
-		if not loopfile:
+		connection.savesummary = savesummary 
+		if not loopfile and spider:
 			savefilespider = savefilebase + ".spider" + suf
 			savespider = opensavefile(savefilespider)
-			connection.savespider = savespider			
+			connection.savespider = savespider
+	
+	print2('\n[+] hoppy ' + version + ' run @ ' + time.asctime() + ':\n')
+	print2('\n\t[+] hoppy ' + ' '.join(argv) + '\n')
 	print2('\n[+] Configuring Test Environment\n')
+	
 	if not hset:
 		print '\n\t[!] hostname (-h) is required\n'
 		usage()
@@ -246,8 +262,14 @@ def parsecmd(argv, connection):
 		sys.exit(1)
 	if auth:
 		connection.addAuth(auth)
-	if check:
-		checkconfig()
+	if depth:
+		if depth.isdigit():
+			connection.depth = depth
+			print '\n\t[+] Spdier Link Depth set to ' + depth
+		else:
+			print '\n\t[!] Supplied depth \'' + depth + '\' is not a number\n'
+			usage()
+			sys.exit(1)
 	if nossl:
 		connection.removessl()
 	if noproxy:
@@ -255,6 +277,13 @@ def parsecmd(argv, connection):
 	if portset:
 		connection.port = port
 	connection.checkConfig()
+	try:
+		if socket.ssl:
+			pass
+	except AttributeError:
+		print2('\n\t[!] Python Sockets does not contain ssl support, install ssl support if you need it\n')
+		if connection.ssl:
+			sys.exit(2)
 	if not connection.port.isdigit() or int(connection.port) > 65535 or int(connection.port) < 1:
 		print '\n\t[!] Supplied port \'' + connection.port + '\' is not a number or out of range 1-65535\n'
 		usage()
@@ -273,13 +302,14 @@ def parsecmd(argv, connection):
 			proxy = proxy.replace('https://', '')
 		try:
 			proxyhost, proxyport = proxy.split(':', 1)
+			proxyport = proxyport.replace('/','')
 			if not proxyport.isdigit() or int(proxyport) > 65535 or int(proxyport) < 1:
 				print '\n\t[!] Supplied Proxy port \'' + proxyport + '\' is not a number or out of range 1-65535\n'
 				usage()
 				sys.exit(1)
 			connection.connection = (proxyhost, int(proxyport))
 		except ValueError, e:
-			print "\n\t[!] Check HTTP_PROXY format is http[s]://host:port\n"
+			print "\n\t[!] Check HTTP_PROXY format it's http[s]://host:port\n"
 			usage()
 			sys.exit(1)
 	else:
@@ -329,7 +359,7 @@ def loadconfig(file): # read hoppy.conf file
 
 #def update: # update from server
 			
-def parsefile(file, name): #
+def parsefile(file, name, num): #
 	text = []
 	errors = 0
 	try:	# try to open the methods file
@@ -354,9 +384,9 @@ def parsefile(file, name): #
 			continue
 		else:
 			try:
-				name, method = line.split(',', 1) # checks that two values are on each line
+				a = line.split(',', num-1) # checks that two values are on each line
 			except:
-				print('\n\t[!] Bad line in config file - ' + file + '\n\n\t\t' + line + '\n')
+				print2('\n\t[!] Bad line in config file - ' + file + '\n\n\t\t' + line + '\n')
 				errors = errors + 1
 				continue
 			text.append(line)
@@ -365,9 +395,11 @@ def parsefile(file, name): #
 def findnextfile(file):
 	filespider = file + ".spider"
 	fileattack = file + ".attack"
-	if os.path.isfile(fileattack) or os.path.isfile(filespider):
+	filesummary = file + ".summary"
+
+	if os.path.isfile(fileattack) or os.path.isfile(filespider) or os.path.isfile(filesummary):
 		x = 1
-		while os.path.isfile(fileattack + "." +str (x)) or os.path.isfile(filespider + "." +str (x)):
+		while os.path.isfile(fileattack + "." +str (x)) or os.path.isfile(filespider + "." +str (x)) or os.path.isfile(filesummary + "." +str (x)):
 				x += 1
 		return "." + str(x)
 	return ""
@@ -401,7 +433,7 @@ def openloopfile(file,text): #
 		for line in text:
 			if line.find('(loop)') >= 0:
 				for lreplace in loop:
-					newtext.append(line.replace('(loop)', lreplace))
+					newtext.append(line.replace('(loop)', lreplace))		
 			else:
 				newtext.append(line)
 	else: # no loopfile therefore remove tem from testing
@@ -419,31 +451,41 @@ def spiderLoop(loop, text):
 		if line.find('(loop)') >= 0:
 			for lreplace in loop:
 				newtext.append(line.replace('(loop)', lreplace))
+				if len(lreplace) > 2:
+					lreplace = lreplace[:2] + '%c0%af' + lreplace[2:] # add extra test for IIS auth bypass
+					newtext.append(line.replace('(loop)', lreplace))
 		else:
 			newtext.append(line)		
 	return (newtext)
 
 def removeHostStuff(text):
-	global host
+	global host, testhost
 	newtext = []
 	if not host:
 		for line in text:
+			line = line.replace('(location)', testhost.location)
+			line = line.replace('(file)', testhost.file)
 			if line.find('(host)') >= 0:
 				newtext.append(line)
 		return (newtext)			
 	else:
 		for line in text:
+			line = line.replace('(location)', testhost.location)
+			line = line.replace('(file)', testhost.file)
 			newtext.append(line)
 			if line.find('(host)') >= 0:
 				newtext.append(line.replace('(host)',""))
 				newtext.append(line.replace('(host)',"hophost"))
+	
 	return (newtext)			
 
 	
 def checkConnection(connection):
-	global verbose, ipaddr
-	head = hopclass.test('GET', 'GET (location)/(file) HTTP/1.1\r\nHost: (host):(port)\r\n\r\n')
-
+	global verbose, ipaddr, testhost
+        headtext = 'GET (location)/(file) HTTP/1.1\r\nHost: (host)\r\n\r\n'
+        headtext = headtext.replace('(location)', testhost.location)
+        headtext = headtext.replace('(file)', testhost.file)
+        head = hopclass.test('GET', 'X', headtext)
 	if connection.proxyon:
 		try:
 			ipaddr = socket.gethostbyname(connection.connection[0])
@@ -471,7 +513,7 @@ def checkConnection(connection):
 		else:
 			print2(' - OK Data Recieved\n')
 		sys.stdout.flush
-		head = hopclass.test('GET', 'GET (location)/(file) HTTP/1.0\r\nHost: (host):(port)\r\n\r\n')
+		head = hopclass.test('GET','X', 'GET (location)/(file) HTTP/1.0\r\nHost: (host)\r\n\r\n')
 
 		if not connection.ssl:
 			head.method = addProxy(head.method)
@@ -501,9 +543,7 @@ def checkConnection(connection):
 	print2( ' - OK Data Recieved\n')
 	sys.stdout.flush()
 
-
 # default option flags
-
 	
 file_dir='/usr/share'
 config_file = '/etc/hoppy/hoppy.conf'
@@ -512,6 +552,7 @@ keywordsfile = sys.path[0] + '/response-keywords'
 savefilebase = ''
 savefilespider = ''
 savefileattack = ''
+savefilesummary = ''
 verbose = 0
 fof = 0
 loopfile = ''
@@ -527,8 +568,8 @@ try:
 	testhost = hopclass.connection()
 	parsecmd(sys.argv[1:], testhost)
 
-	text, errors = parsefile(methodsfile, 'Methods File')
-	keywords, errors2 = parsefile(keywordsfile, 'Keywords File')
+	text, errors = parsefile(methodsfile, 'Methods File', 3)
+	keywords, errors2 = parsefile(keywordsfile, 'Keywords File', 2)
 	errors = errors + errors2
 	if not host:
 		print2('\n\t[!] Running in App Only Mode\n')
@@ -537,6 +578,7 @@ try:
 		print2('\n\t[!] Spider is Disabled\n')
 	if savefilebase:
 		print2('\n\t[+] Saving Attack data to ' + savefileattack + '\n')
+		print2('\n\t[+] Saving Summary data to ' + savefilesummary + '\n')
 		if spider and not loopfile:
 			print2('\n\t[+] Saving Spider data to ' + savefilespider + '\n')
 	if loopfile:
@@ -568,12 +610,12 @@ try:
 		print2('\n[+] Testing http://' + testhost.hostname +':' + testhost.port + ' [' + ipaddr + '] with '  + testhost.location + '/' + testhost.file + ' as webDAV location\n\n')
 
 	if not verbose:
-		print '\t[+] ',
+		print2('\t[+] '),
 		sys.stdout.flush()
 	if nothreading:
 		for x in text:			# test methods from file
-			name, method = x.split(',',1)
-			test = hopclass.test(name, method.lstrip().rstrip())
+			name, interesting, method = x.split(',',2)
+			test = hopclass.test(name, interesting.lstrip().rstrip(), method.lstrip().rstrip())
 			if verbose:
 				print2('\n[+] Testing ' + test.name + ' request on ' + testhost.location + testhost.file + '\n')
 				sys.stdout.flush()
@@ -583,6 +625,7 @@ try:
 			testhost.errors += test.summarise(keywords)
 			test.export(sys.stdout, verbose)
 			if savefilebase:
+				test.export(savesummary, 0)
 				test.export(save, 3)
 			testhost.tests.append(test)
 	else:
@@ -613,6 +656,7 @@ try:
 	testhost.summary()					
 	testhost.exportSummary(sys.stdout, fof)
 	if savefilebase:
+		testhost.exportSummary(savesummary, fof)
 		testhost.exportSummary(save, 1)
 
 	if testhost.errors and not fof:

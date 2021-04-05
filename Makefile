@@ -1,4 +1,4 @@
-VERSION = 1.7.3 
+VERSION = 1.8.1 
 PREFIX_DIR = $(PREFIX)
 ETC = /etc/hoppy
 SHARE = $(PREFIX_DIR)/usr/local/share/hoppy
