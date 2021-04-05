@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.6.3
+	Version 1.6.4
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -366,7 +366,7 @@ class regex:
 	ips = re.compile('.{0,60}(\d{1,3}\.){3}\d{1,3}.{0,60}') 			# regex to isoloate IP address
 	pathw = re.compile('[A-z]:\\\\([^\\\\]*\\\\){0,10}')				# regex to match windows filename
 	pathl = re.compile('/([^/]*/){0,10}w[we][wb]root/([^/]*/){0,10}')	# regex to match linux filename		
-	host = re.compile('^(https?://)?((\S*:\S*)@)?([A-z.]*)(:(\d+))?((/\S*)?/(\S*.\S*)?)?', re.I)
+	host = re.compile('^(https?://)?((\S*:\S*)@)?([A-z0-9.]*)(:(\d+))?((/\S*)?/(\S*.\S*)?)?', re.I)
 
 	def matchip(IP):
 		

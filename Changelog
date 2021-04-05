@@ -1,3 +1,5 @@
+<1.6.4> - 21/08/2008 - Fixed bug with new host stuff as I forgot number is the regex
+
 <1.6.3> - 20/08/2008 - Added host parsing so that http://user:pass@domain.com:port/location/file.txt will get correctly parsed
 
 <1.6.2> - 12/08/2008 - Added crossdomin.xml to list
