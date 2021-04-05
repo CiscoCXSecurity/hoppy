@@ -1,5 +1,5 @@
 
-[H]ttp [O]ptions [P]rober in [PY]thon - 1.5.12 
+[H]ttp [O]ptions [P]rober in [PY]thon - 1.6.0 
 
 This is hoppy, a http method prober, it is a python script which tests http methods for configuration issues leaking information or just to see if they are enabled.
 
@@ -52,20 +52,23 @@ Having a large number of failed tests is not a great concern as sometimes these 
 == Usage == 
 
 
-  Usage: ./hoppy -h <[http[s]]://hostname[:port]> [options]
+  Usage: /usr/local/bin/hoppy -h <[http[s]]://hostname[:port]> [options]
 
-         -h [http[s]]://]hostname[:port] [--host=]       (required)
+         -h [http[s]]://]hostname[:port] [--host=]       (required or -H)
+         -H [http[s]]://]hostname[:port] [--host=]       (app only, shortcut for -h host -A)
          -p port [--port=]                               (default 80)
-         -l location [--location=]                       (default images)
+         -l location [--location=]                       (default /images)
          -f file [--file=]                               (default dummy.txt)
-         -o methods_file [--options=]                    (default /etc/hoppy/http-methods)
-         -k keywords_file [--keywords=]                  (default /etc/hoppy/response-keywords)
+         -o methods_file [--options=]                    (default /usr/local/share/http-methods)
+         -k keywords_file [--keywords=]                  (default /usr/local/share/response-keywords)
          -r realhostname [--name=]                       (default same as hostname)
-         -t port-timeout [--timeout=]                    (default 2s)
+         -t port-timeout [--timeout=]                    (default 10s)
+         -T max_thread_count [--threads=]                (default 20)
          -a username:password [--auth=]                  (Basic Auth only)
          -C config_file [--config=]                      (Load an alternative for /etc/hoppy/hoppy.conf)
          -S file [--save=]                               (save output to file)
          -L file [--loop=]                               (loop around valid methods)
+         -A [--apponly]                                  (disable the host checks)
          -s [--ssl]                                      (use ssl)
          -n [--nossl]                                    (disable ssl, takes precedence)
          -4 [--404]                                      (do not supress 404's, 100's or 400 or 000 errors)
@@ -80,6 +83,8 @@ Having a large number of failed tests is not a great concern as sometimes these 
 Hopefully the usage is explanitary enough but if not ....
 
 -h hostname is the URL of the webserver you wish to test e.g. www.google.com or http://www.google.com:80. If www.google.com:443 is used ssl negotiation is autoenabled, https://www.google.com will auto set port to 443 unless it has explcitly ser elsewhere and put on the ssl negotiation.
+
+-H shortcut for -h host -A (see below for -A)
 
 -p port if you need this explained then maybe you shouldn't be using this tool
 
@@ -101,6 +106,9 @@ Hopefully the usage is explanitary enough but if not ....
 
 -L loop around valid methods, this function repeats all methods that contain the (loop) keyword replacing the keyword each time with a new entry from the loop file. This is particularily useful when you wish to test for webDav in a number of location on a webserver.
 
+-A Runs in application only mode, this will only send requests with a correctly formatted Host: header. This will miss some Internal
+   IP addresses but will stick to your vhost!
+
 -s switch on ssl negotioation
 
 -4 404 supression is enabled by default, this behaviour can be removed by this switch
@@ -111,7 +119,7 @@ Hopefully the usage is explanitary enough but if not ....
 
 -v will print what is going on as we progress through the test
 -vv will print the entire server response
--vvv will print both the request sent and the server resose. 
+-vvv will print both the request sent and the server respose. 
 
 Hope that all makes sense
 

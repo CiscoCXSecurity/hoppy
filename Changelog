@@ -1,3 +1,7 @@
+<1.6.0> - 19/06/2008 - Added -H flag which puts it into app only mode. This will only do tests with a corrct vhost
+					   Added methods to test with a bad vhost name
+					   Fixed Proxy bug {It Didn't work!}
+
 <1.5.12> - 17/06/2008 - broke backwards compatability with python <2.5 in 1.5.10 now fixed
 
 <1.5.11> - 02/06/2008 - now checks for thread support and disables if nescesary

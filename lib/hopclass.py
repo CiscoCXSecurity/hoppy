@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.5.12
+	Version 1.6.0
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -203,6 +203,7 @@ class connection:
 			proxy = os.getenv('http_proxy')
 		if proxy != None and not self.noproxy:
 			self.proxyon = 1
+			print '\n\t[+] Proxy Enabled'
 			#timeout = timeout * 5
 			if proxy.find('http://') == 0:
 				proxy = proxy.replace('http://', '')

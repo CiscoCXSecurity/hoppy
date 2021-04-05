@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.5.12 
+	Version 1.6.0 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 """
 
-version = '1.5.12'
+version = '1.6.0'
 
 import socket, sys, getopt, time
 
@@ -61,7 +61,7 @@ class testit(Thread):
 		self.name, self.method = x.split(',',1)
 		self.test = hopclass.test(self.name, self.method.lstrip().rstrip())
 		if self.testhost.proxyon and not self.testhost.ssl:
-			self.test.method = addProxy(test.method)
+			self.test.method = addProxy(self.test.method)
 		
 	def run(self):
 
@@ -88,7 +88,8 @@ class testit(Thread):
 __doc__ = '\n  hoppy ' + version + ' - (C) 2007 deanx\n\n' 
 __doc__ += '\t\t\t RID[at]Portcullis-Security.com\n\n' 
 __doc__ += '  Usage: ' + sys.argv[0] +' -h <[http[s]]://hostname[:port]> [options]\n\n'
-__doc__ += '\t -h [http[s]]://]hostname[:port] [--host=]\t (required)\n'
+__doc__ += '\t -h [http[s]]://]hostname[:port] [--host=]\t (required or -H)\n'
+__doc__ += '\t -H [http[s]]://]hostname[:port] [--host=]\t (app only, shortcut for -h host -A)\n'
 __doc__ += '\t -p port [--port=]\t\t\t\t (default 80)\n'
 __doc__ += '\t -l location [--location=]\t\t\t (default /images)\n'
 __doc__ += '\t -f file [--file=]\t\t\t\t (default dummy.txt)\n'
@@ -101,6 +102,7 @@ __doc__ += '\t -a username:password [--auth=]\t\t\t (Basic Auth only)\n'
 __doc__ += '\t -C config_file [--config=] \t\t\t (Load an alternative for /etc/hoppy/hoppy.conf)\n'
 __doc__ += '\t -S file [--save=]\t\t\t\t (save output to file)\n'
 __doc__ += '\t -L file [--loop=]\t\t\t\t (loop around valid methods)\n'
+__doc__ += '\t -A [--apponly]\t\t\t\t\t (disable the host checks)\n'
 __doc__ += '\t -s [--ssl]\t\t\t\t\t (use ssl)\n'
 __doc__ += '\t -n [--nossl]\t\t\t\t\t (disable ssl, takes precedence)\n'
 __doc__ += '\t -4 [--404]\t\t\t\t\t (do not supress 404\'s, 100\'s or 400 or 000 errors)\n'
@@ -154,16 +156,17 @@ def checkconfig(): # Check to make sure the config only conatins valid lines
 
 
 def parsecmd(argv, connection):
-	global verbose, fof, config_file, methodsfile, keywordsfile, savefile, loopfile, maxthreads, nothreading
+	global verbose, fof, config_file, methodsfile, keywordsfile, savefile, loopfile, maxthreads, nothreading, host, save
 	nossl = 0
 	portset = 0
 	check = 0
 	noproxy = 0
+	hset = 0
 	try:
-		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:k:4t:a:r:w:NS:L:T:", ["help","location=","file=", "host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy", "config=", "save=", "loop=", "threads="])
+		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:H:k:4At:a:r:NS:L:T:", ["help","location=","file=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy","--apponly", "config=", "save=", "loop=", "threads="])
 	except getopt.GetoptError, e:
 		usage()
-		print '  [!] ' + str(e) + '\n'
+		print '\n\t[!] ' + str(e) + '\n'
 		sys.exit(2)
 	for opt, arg in opts:
 		if opt == '--help':
@@ -171,6 +174,7 @@ def parsecmd(argv, connection):
 			sys.exit()
 		elif opt in ("-h", "--host"):
 			connection.host = arg.lower()
+			hset = hset + 1
 		elif opt in ("-a", "--auth"):
 			connection.addAuth(arg)
 		elif opt in ("-r", "--name"):
@@ -208,7 +212,20 @@ def parsecmd(argv, connection):
 			savefile = arg
 		elif opt in ('-L', '--loop'):
 			loopfile = arg
-		
+		elif opt in ('-A', '--apponly'):
+			loopfile = arg
+			host = 0
+		elif opt in ('-H', '--Host'):
+			host = 0
+			connection.host = arg.lower()
+			hset = hset + 1
+	if savefile:
+		save = opensavefile(savefile)		
+	print2('\n[+] Configuring Test Environment\n')
+	if hset > 1:
+		print '\n\t[!] Make your mind up -h or -H (and only one of them!)\n'
+		usage()
+		sys.exit(2)
 	if check:
 		checkconfig()
 	if nossl:
@@ -217,33 +234,32 @@ def parsecmd(argv, connection):
 		connection.removeproxy()
 	if portset:
 		if not port.isdigit() or int(port) > 65535 or int(port) < 1:
+			print '\n\t[!] Supplied port (-p ' + port + ') is not a number or out of range 1-65535\n'
 			usage()
-			print '  [!] Supplied port (-p ' + port + ') is not a number or out of range 1-65535\n'
 			sys.exit(2)
 		connection.port = port
 	connection.checkConfig()
-
 	if not maxthreads.isdigit() or int(maxthreads) > 65535 or int(maxthreads) < 0:
-		usage()
 		print '  [!] Supplied thread count (-T ' + maxthreads + ') is not a number or out of range 1-65535\n'
+		usage()
 		sys.exit(2)
 	elif int(maxthreads) == 0 or nothreading:
-		print2('\n[!] Threading is disabled\n')
+		print2('\n\t[!] Threading is disabled\n')
 		nothreading = 1
 	try:
 		connection.timeout = float(connection.timeout)
 	except:
+		print '\n\t[!] Supplied timeout (-t ' + connection.timeout + ') is not valid\n'
 		usage()
-		print '  [!] Supplied timeout (-t ' + connection.timeout + ') is not valid\n'
 		sys.exit(2)
-	if not connection.host:
+	if not hset:
+		print '\n\t[!] hostname (-h) is required\n'
 		usage()
-		print '  [!] hostname (-h) is required\n'
 		sys.exit(2)
 		
 	
 def loadconfig(file): # read hoppy.conf file
-	global server, file_dir, methodsfile, keywordsfile
+	global server, file_dir, methodsfile, keywordsfile, host
 	try:	# try to open the methods file
 		in_file = open(file, "r")	
 		temp = in_file.read().splitlines()
@@ -264,7 +280,8 @@ def loadconfig(file): # read hoppy.conf file
 				location = line.split('=',1)[1]
 			except:
 				print '\n\t[!] Config File Error check UPDATE_SERVER value\n\n'
-
+		if line.find('CHECKHOST') == 0:
+			host = 1
 
 #def update: # update from server
 			
@@ -339,7 +356,14 @@ def openloopfile(file,text): #
 			else:
 				newtext.append(line)			
 	return (newtext)
-		
+
+def removeHostStuff(text):
+	newtext = []
+	for line in text:
+		if line.find('(host)') >= 0:
+			newtext.append(line)
+	return (newtext)			
+			
 
 	
 def checkConnection(connection):
@@ -425,6 +449,7 @@ verbose = 0
 fof = 0
 loopfile = ''
 maxthreads = '20'
+host = 1
 
 # read command line and inport config files
 
@@ -434,20 +459,21 @@ try:
 	testhost = hopclass.connection()
 	parsecmd(sys.argv[1:], testhost)
 
-	if savefile:
-		save = opensavefile(savefile)
-	print2('\n[+] Configuring Test Environment')
+
 	text, errors = parsefile(methodsfile, 'Methods File')
 	keywords, errors2 = parsefile(keywordsfile, 'Keywords File')
 	errors = errors + errors2
+	if not host:
+		print2('\n\t[!] Running in App Only Mode\n')
+		text = removeHostStuff(text)
 	text = openloopfile(loopfile,text)
 	if len(text) == 0:
-		print2('\n[!] No Valid Methods to Test\n\n')
+		print2('\n\t[!] No Valid Methods to Test\n\n')
 		sys.exit(2)
 	if errors == 0:
-		print2(' - Done :-)\n')
+		print2('\n\t[+] Setup complete :-)\n')
 	else:
-		print2('\n\n\t[+] Configuration files Sucesfully Loaded\n')
+		print2('\n\t[+] Configuration files Sucesfully Loaded\n')
 
 	print2('\n[+] Initialising Connection\n')
 	checkConnection(testhost)	 
