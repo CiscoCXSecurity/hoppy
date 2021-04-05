@@ -12,7 +12,7 @@
 # (auth) will be replaced by the basic auth credentials if supplied
 # (loop) will be replaced in a loop with all entries in the loop file 
 # 
-# Supplied with hoppy 1.6.0 
+# Supplied with hoppy 1.6.2 
 
 
 # Base Case Analysis
@@ -156,13 +156,19 @@ Frontpage Post Inf, GET /postinfo.html HTTP/1.1\nHost: (host)\n(auth)\n\n
 Frontpage shtml.dll, GET /_vti_bin/shtml.dll HTTP/1.1\nHost: (host)\n(auth)\n\n
 Frontpage admin.dll, GET /_vti_bin/shtml.dll/_vti_adm/admin.dll HTTP/1.1\nHost: (host)\n(auth)\n\n
 Frontpage author.dll, GET /_vti_bin/shtml.dll/_vti_aut/admin.dll HTTP/1.1\nHost: (host)\n(auth)\n\n
+Frontpage dir (bin), GET /_vti_bin/ HTTP/1.1\nHost: (host)\n(auth)\n\n
+Frontpage dir (pvt), GET /_vti_pvt/ HTTP/1.1\nHost: (host)\n(auth)\n\n
+Frontpage dir (cnf), GET /_vti_cnf/ HTTP/1.1\nHost: (host)\n(auth)\n\n
+Frontpage dir (log), GET /_vti_log/ HTTP/1.1\nHost: (host)\n(auth)\n\n
+Frontpage dir (script), GET /_vti_script/ HTTP/1.1\nHost: (host)\n(auth)\n\n
+Frontpage dir (txt), GET /_vti_txt/ HTTP/1.1\nHost: (host)\n(auth)\n\n
 Frontpage leakage, POST /_vti_bin/shtml.dll/_vti_rpc HTTP/1.1\nHost: (host)\n(auth)\nExpect: 100-continue\nContent-Length: 58\nContent-Type: application/x-www-form-urlencoded\nMIME-Version: 1.0\nX-Vermeer-Content-Type: application/x-www-form-urlencoded\n\n(wait)method=open+service%3a3%2e0%2e2%2e1105&service%5fname=%2f\n\n
 
 # Apache 
 
 MultiViews Check, GET /index HTTP/1.1\nHost: (host)\n(auth)\nAccept: application/whatever; q=1.0\n\n
 Expect Header, GET (location)/ HTTP/1.1\nHost: (host)\n(auth)\nExpect: <script>XSSdetect</script>\n\n
-
+413 XSS, <script>XSSdetect</script> / HTTP/1.1\nHost: (host)\nContent-length: -1\n(auth)\n\n
 # Proxy Connection Tests
 
 # Add lcoalhost check on some ports
@@ -180,6 +186,8 @@ phpinfo, GET /index.php?=PHPB8B5F2A0-3C92-11d3-A3A9-4C7B08C10000 HTTP/1.1\nHost:
 # Robots.txt
 
 Robots.txt, GET /robots.txt HTTP/1.1\nHost: (host)\n(auth)\n\n
+crossdomain.xml, GET /crossdomain.xml HTTP/1.1\nHost: (host)\n(auth)\n\n
+
 
 # propfind loop
 
@@ -192,92 +200,5 @@ Propfind, PROPFIND (loop)/ HTTP/1.1\nHost: (host)\n(auth)\nContent-Length: 0\n\n
 tomcat manager, GET /manager/html HTTP/1.1\nHost: (host)\n(auth)\n\n
 tomcat admin, GET /admin HTTP/1.1\nHost: (host)\n(auth)\n\n
 
-# test bad vhost
-
-Invalid Method, HOPPY (location)/ HTTP/1.1\nHost: hophost\n(auth)\n\n
-Options, OPTIONS / HTTP/1.1\nHost: hophost\n(auth)\n\n
-Options, OPTIONS * HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location) HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, get (location) HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/|.asp HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/~.asp HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/trace.asp HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/|.aspx HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/~.aspx HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/trace.asp HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/|.axd HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/~.axd HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET (location)/trace.axd HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET /trace.axd HTTP/1.1\nHost: hophost\n(auth)\n\n
-Info, GET /CFIDE/probe.cfm HTTP/1.1\nHost: hophost\nUser-Agent: Firefox</td><script>ColdfusionXSSdetect<script>\n(auth)\n\n
-Info, GET (location)/NULL.REM HTTP/1.1\nHost: hophost\n(auth)\n\n
-Track, TRACK (location)/ HTTP/1.1\nHost: hophost\n(auth)\n\nTRACE /anything\nCookie: secret\n\n
-Trace, TRACE (location)/ HTTP/1.1\nHost: hophost\n(auth)\n\nTRACE /anything\nCookie: secret\n\n
-Track, TRACK (location)/ HTTP/1.1\nHost: hophost\n(auth)\n\nTRACK <script>XSSdetect</script>\n\n
-Trace, TRACE (location)/ HTTP/1.1\nHost: hophost\n(auth)\n\nTRACE <script>XSSdetect</script>\n\n
-Track, TRACK / HTTP/1.1\nHost: hophost\nVia: <script>XSSdetect</script>\n(auth)\n\n
-Trace, TRACE / HTTP/1.1\nHost: hophost\nVia: <script>XSSdetect</script>\n(auth)\n\n
-Trace, TRACE /<script>XSSdetect</script> HTTP/1.1\nHost: hophost\n(auth)\n\n
-Track, TRACK /<script>XSSdetect</script> HTTP/1.1\nHost: hophost\n(auth)\n\n
-Copy, COPY (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nDestination: http:/(host)(location)/(file).copy\nOverwrite: T\n\n
-Put, PUT (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nExpect: 100-continue\nContent-Length: 6\n\n(wait)testme\n\n
-Delete, DELETE (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\n\n
-Debug, DEBUG (location)/(file).aspx HTTP/1.0\nAccept: */*\nHost: hophost\n(auth)\nContent-Length: 0\nCommand: stop-debug\nConnection: closed\n\n
-Put, PUT (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nExpect: 100-continue\nContent-Length: 6\n\n(wait)testme\n\n
-Copy, COPY (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nDestination: http:/(host)(location)/(file).html\nOverwrite: T\n\n
-Lock, LOCK (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nTimeout: Second-100\nDepth: 0\nContent-Type: text/xml\nTranslate: f\nContent-Length: 0\n\n
-Lock, LOCK (location)/ HTTP/1.1\nHost: hophost\n(auth)\nTimeout: Second-100\nDepth: 0\nContent-Type: text/xml\nTranslate: f\nContent-Length: 0\n\n
-unLock, UNLOCK (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nLock-Token: <>\n\n
-unLock, UNLOCK (location)/ HTTP/1.1\nHost: hophost\n(auth)\nLock-Token: <>\n\n
-Move, MOVE (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nDestination: http:/(host)(location)/(file).html\n\n
-mkcol, MKCOL (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nDestination: http:/(host)(location)/test\n\n
-Delete, DELETE (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\n\n
-Copy, COPY (location)/(file).copy HTTP/1.1\nHost: hophost\n(auth)\nDestination: http:/(host)(location)/(file)\nOverwrite: T\n\n
-Propfind, PROPFIND (location)/ HTTP/1.1\nHost: hophost\n(auth)\nContent-Length: 0\n\n
-Propfind, PROPFIND / HTTP/1.1\nHost: hophost\n(auth)\nContent-Length: 0\n\n
-Propfind, PROPFIND /images HTTP/1.1\nHost: hophost\n(auth)\nContent-Length: 0\n\n
-Propfind, PROPFIND (location)/(file) HTTP/1.1\nhost: hophost\n(auth)\nDepth: 1\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 143\nTranslate: f\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<propfind xmlns="DAV:">\n<prop>\n<checked-in />\n<checked-out />\n</prop>\n<dead-props />\n</propfind>\n\n
-Propfind, PROPFIND (location)/ HTTP/1.1\nhost: hophost\n(auth)\nDepth: 1\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 143\nTranslate: f\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<propfind xmlns="DAV:">\n<prop>\n<checked-in />\n<checked-out />\n</prop>\n<dead-props />\n</propfind>\n\n
-Proppatch, PROPPATCH (location)/(file) HTTP/1.1\nHost: hophost\n(auth)\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 300\nTranslate: F\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<D:propertyupdate xmlns:D="DAV:" xmlns:Z="http://www.w3.com/standards/z39.50/">\n<D:set>\n<D:prop>\n<Z:authors>\n<Z:Author>deanx</Z:Author>\n</Z:authors>\n</D:prop>\n</D:set>\n<D:remove>\n<D:prop><Z:Copyright-Owner/></D:prop>\n</D:remove>\n</D:propertyupdate>\n\n
-Proppatch, PROPPATCH (location)/ HTTP/1.1\nHost: hophost\n(auth)\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 300\nTranslate: F\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<D:propertyupdate xmlns:D="DAV:" xmlns:Z="http://www.w3.com/standards/z39.50/">\n<D:set>\n<D:prop>\n<Z:authors>\n<Z:Author>deanx</Z:Author>\n</Z:authors>\n</D:prop>\n</D:set>\n<D:remove>\n<D:prop><Z:Copyright-Owner/></D:prop>\n</D:remove>\n</D:propertyupdate>\n\n
-Basic Auth, GET /default.asp HTTP/1.1\nHost: hophost\nAuthorization: Basic c2x1Z3M6a2lja2Fzcw==\n\n
-Basic Auth, GET (location)/(file) HTTP/1.1\nHost: hophost\nAuthorization: Basic c2x1Z3M6a2lja2Fzcw==\n\n
-NTLM Auth, GET / HTTP/1.1\nHost: hophost\nAuthorization: Negotiate TlRMTVNTUAABAAAAB4IAoAAAAAAAAAAAAAAAAAAAAAA=\n\n
-NTLM Auth, GET (location)/(file) HTTP/1.1\nHost: hophost\nAuthorization: Negotiate TlRMTVNTUAABAAAAB4IAoAAAAAAAAAAAAAAAAAAAAAA=\n\n
-NTLM Auth, GET /exchange/(file) HTTP/1.1\nHost: hophost\nAuthorization: Negotiate TlRMTVNTUAABAAAAB4IAoAAAAAAAAAAAAAAAAAAAAAA=\n\n
-Digest Auth, GET / HTTP/1.1\nHost: hophost\nAuthorization: Digest Digest username="test", realm="slugs", qop="auth", algorithm="MD5", uri="/", nonce="Ny8yLzIwMDIgMzoyNjoyNCBQTQ", nc=00000001, cnonce="c51b5139556f939768f770dab8e5277a", opaque="0000000000000000", response="afa30c6445a14e2817a423ca4a143792"\n\n
-Digest Auth, GET (location)/(file) HTTP/1.1\nHost: hophost\nAuthorization: Digest Digest username="test", realm="slugs", qop="auth", algorithm="MD5", uri="(location)/(file)", nonce="Ny8yLzIwMDIgMzoyNjoyNCBQTQ", nc=00000001, cnonce="c51b5139556f939768f770dab8e5277a", opaque="0000000000000000", response="afa30c6445a14e2817a423ca4a143792"\n\n
-Digest Auth, GET /exchange/(file) HTTP/1.1\nHost: hophost\nAuthorization: Digest Digest username="test", realm="slugs", qop="auth", algorithm="MD5", uri="(location)/(file)", nonce="Ny8yLzIwMDIgMzoyNjoyNCBQTQ", nc=00000001, cnonce="c51b5139556f939768f770dab8e5277a", opaque="0000000000000000", response="afa30c6445a14e2817a423ca4a143792"\n\n
-IIS Cookie Test, GET /default.asp HTTP/1.1\nHost: hophost\nCookie: =badthingsmayhapped=good\n(auth)\n\n
-IIS Cookie Test, GET /index.html HTTP/1.1\nHost: hophost\nCookie: =badthingsmayhapped=good\n(auth)\n\n
-IIS Cookie Test, GET (location)/ HTTP/1.1\nHost: hophost\nCookie: =badthingsmayhapped=good\n(auth)\n\n
-IIS Cookie Test, GET (location)/(file) HTTP/1.1\nHost: hophost\nCookie: =badthingsmayhapped=good\n(auth)\n\n
-IIS Cookie Test, GET (location)/(file).asp HTTP/1.1\nHost: hophost\nCookie: =badthingsmayhapped=good\n(auth)\n\n
-.printer, GET (location)/foo.printer HTTP/1.1\nHost: hophost\n(auth)\n\n
-.idc, GET (location)/foo.idc HTTP/1.1\nHost: hophost\n(auth)\n\n
-.idq, GET (location)/foo.idq HTTP/1.1\nHost: hophost\n(auth)\n\n
-.ida, GET (location)/foo.ida HTTP/1.1\nHost: hophost\n(auth)\n\n
-.htr, GET (location)/foo.htr HTTP/1.1\nHost: hophost\n(auth)\n\n
-.htw, GET (location)/foo.htw HTTP/1.1\nHost: hophost\n(auth)\n\n
-.stm, GET (location)/foo.stm HTTP/1.1\nHost: hophost\n(auth)\n\n
-.shtm, GET (location)/foo.shtm HTTP/1.1\nHost: hophost\n(auth)\n\n
-.shtml, GET (location)/foo.shtml HTTP/1.1\nHost: hophost\n(auth)\n\n
-Frontpage Config Inf, GET /_vti_inf.html HTTP/1.1\nHost: hophost\n(auth)\n\n
-Frontpage Post Inf, GET /postinfo.html HTTP/1.1\nHost: hophost\n(auth)\n\n
-Frontpage shtml.dll, GET /_vti_bin/shtml.dll HTTP/1.1\nHost: hophost\n(auth)\n\n
-Frontpage admin.dll, GET /_vti_bin/shtml.dll/_vti_adm/admin.dll HTTP/1.1\nHost: hophost\n(auth)\n\n
-Frontpage author.dll, GET /_vti_bin/shtml.dll/_vti_aut/admin.dll HTTP/1.1\nHost: hophost\n(auth)\n\n
-Frontpage leakage, POST /_vti_bin/shtml.dll/_vti_rpc HTTP/1.1\nHost: hophost\n(auth)\nExpect: 100-continue\nContent-Length: 58\nContent-Type: application/x-www-form-urlencoded\nMIME-Version: 1.0\nX-Vermeer-Content-Type: application/x-www-form-urlencoded\n\n(wait)method=open+service%3a3%2e0%2e2%2e1105&service%5fname=%2f\n\n
-MultiViews Check, GET /index HTTP/1.1\nHost: hophost\n(auth)\nAccept: application/whatever; q=1.0\n\n
-Expect Header, GET (location)/ HTTP/1.1\nHost: hophost\n(auth)\nExpect: <script>XSSdetect</script>\n\n
-phpinfo, GET /phpinfo.php HTTP/1.1\nHost: hophost\n(auth)\n\n
-phpinfo, GET /config/index.php HTTP/1.1\nHost: hophost\n(auth)\n\n
-phpinfo, GET /index.php?=PHPB8B5F2A0-3C92-11d3-A3A9-4C7B08C10000 HTTP/1.1\nHost: hophost\n(auth)\n\n
-Robots.txt, GET /robots.txt HTTP/1.1\nHost: hophost\n(auth)\n\n
-webDav on (loop), PROPFIND (loop)/ HTTP/1.1\nhost: hophost\n(auth)\nDepth: 1\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 143\nTranslate: f\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<propfind xmlns="DAV:">\n<prop>\n<checked-in />\n<checked-out />\n</prop>\n<dead-props />\n</propfind>\n\n
-Propfind, PROPFIND (loop)/ HTTP/1.1\nHost: hophost\n(auth)\nContent-Length: 0\n\n
-tomcat manager, GET /manager/html HTTP/1.1\nHost: hophost\n(auth)\n\n
-tomcat admin, GET /admin HTTP/1.1\nHost: hophost\n(auth)\n\n
 
 

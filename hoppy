@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.6.0 
+	Version 1.6.2 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 """
 
-version = '1.6.0'
+version = '1.6.2'
 
 import socket, sys, getopt, time
 
@@ -46,50 +46,51 @@ try:
 	import threading
 	from threading import Thread
 except ImportError, e:
+	Therad = 0
 	nothreading = 1
 
 
 sys.path.append(sys.path[0] + '/lib')
 import hopclass
 
-
-class testit(Thread):
-	def __init__ (self,testhost,x):
-		Thread.__init__(self)
-		global verbose
-		self.testhost = testhost 
-		self.name, self.method = x.split(',',1)
-		self.test = hopclass.test(self.name, self.method.lstrip().rstrip())
-		if self.testhost.proxyon and not self.testhost.ssl:
-			self.test.method = addProxy(self.test.method)
+if not nothreading:
+	class testit(Thread):
+		def __init__ (self,testhost,x):
+			Thread.__init__(self)
+			global verbose
+			self.testhost = testhost 
+			self.name, self.method = x.split(',',1)
+			self.test = hopclass.test(self.name, self.method.lstrip().rstrip())
+			if self.testhost.proxyon and not self.testhost.ssl:
+				self.test.method = addProxy(self.test.method)
 		
-	def run(self):
+		def run(self):
 
-		self.testhost.send(self.test)
-		self.testhost.errors += self.test.summarise(keywords)
-		screen.acquire()
-		try:
-			if verbose:
-				print2('\n[+] Testing ' + self.test.name + ' request on ' + testhost.location + '/' + testhost.file + '\n')
-			self.test.export(sys.stdout, verbose)
-			sys.stdout.flush()
-		finally:
-   			screen.release() # release lock, no matter what	
-		if savefile:
-			disk.acquire()
+			self.testhost.send(self.test)
+			self.testhost.errors += self.test.summarise(keywords)
+			screen.acquire()
 			try:
-				self.test.export(save, 3)
+				if verbose:
+					print2('\n[+] Testing ' + self.test.name + ' request on ' + testhost.location + '/' + testhost.file + '\n')
+				self.test.export(sys.stdout, verbose)
+				sys.stdout.flush()
 			finally:
-   				disk.release() # release lock, no matter what				
-		self.testhost.tests.append(self.test)
-		pool_sema.release()   
+   				screen.release() # release lock, no matter what	
+			if savefile:
+				disk.acquire()
+				try:
+					self.test.export(save, 3)
+				finally:
+   					disk.release() # release lock, no matter what				
+			self.testhost.tests.append(self.test)
+			pool_sema.release()   
     
     
 __doc__ = '\n  hoppy ' + version + ' - (C) 2007 deanx\n\n' 
 __doc__ += '\t\t\t RID[at]Portcullis-Security.com\n\n' 
 __doc__ += '  Usage: ' + sys.argv[0] +' -h <[http[s]]://hostname[:port]> [options]\n\n'
 __doc__ += '\t -h [http[s]]://]hostname[:port] [--host=]\t (required or -H)\n'
-__doc__ += '\t -H [http[s]]://]hostname[:port] [--host=]\t (app only, shortcut for -h host -A)\n'
+__doc__ += '\t -H [http[s]]://]hostname[:port] [--Host=]\t (app only, shortcut for -h host -A)\n'
 __doc__ += '\t -p port [--port=]\t\t\t\t (default 80)\n'
 __doc__ += '\t -l location [--location=]\t\t\t (default /images)\n'
 __doc__ += '\t -f file [--file=]\t\t\t\t (default dummy.txt)\n'
@@ -163,7 +164,7 @@ def parsecmd(argv, connection):
 	noproxy = 0
 	hset = 0
 	try:
-		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:H:k:4At:a:r:NS:L:T:", ["help","location=","file=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy","--apponly", "config=", "save=", "loop=", "threads="])
+		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:H:k:4At:a:r:NS:L:T:", ["help","location=","file=", "host=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy","apponly", "config=", "save=", "loop=", "threads="])
 	except getopt.GetoptError, e:
 		usage()
 		print '\n\t[!] ' + str(e) + '\n'
@@ -222,6 +223,10 @@ def parsecmd(argv, connection):
 	if savefile:
 		save = opensavefile(savefile)		
 	print2('\n[+] Configuring Test Environment\n')
+	if not hset:
+		print '\n\t[!] hostname (-h) is required\n'
+		usage()
+		sys.exit(2)
 	if hset > 1:
 		print '\n\t[!] Make your mind up -h or -H (and only one of them!)\n'
 		usage()
@@ -250,10 +255,6 @@ def parsecmd(argv, connection):
 		connection.timeout = float(connection.timeout)
 	except:
 		print '\n\t[!] Supplied timeout (-t ' + connection.timeout + ') is not valid\n'
-		usage()
-		sys.exit(2)
-	if not hset:
-		print '\n\t[!] hostname (-h) is required\n'
 		usage()
 		sys.exit(2)
 		
@@ -349,7 +350,7 @@ def openloopfile(file,text): #
 					newtext.append(line.replace('(loop)', lreplace))
 			else:
 				newtext.append(line)
-	else:
+	else: # no loopfile therefore remove tem from testing
 		for line in text:
 			if line.find('(loop)') >= 0:
 				continue
@@ -358,12 +359,20 @@ def openloopfile(file,text): #
 	return (newtext)
 
 def removeHostStuff(text):
+	global host
 	newtext = []
-	for line in text:
-		if line.find('(host)') >= 0:
+	if not host:
+		for line in text:
+			if line.find('(host)') >= 0:
+				newtext.append(line)
+		return (newtext)			
+	else:
+		for line in text:
 			newtext.append(line)
+			if line.find('(host)') >= 0:
+				newtext.append(line.replace('(host)',""))
+				newtext.append(line.replace('(host)',"hophost"))
 	return (newtext)			
-			
 
 	
 def checkConnection(connection):
@@ -465,7 +474,7 @@ try:
 	errors = errors + errors2
 	if not host:
 		print2('\n\t[!] Running in App Only Mode\n')
-		text = removeHostStuff(text)
+	text = removeHostStuff(text)
 	text = openloopfile(loopfile,text)
 	if len(text) == 0:
 		print2('\n\t[!] No Valid Methods to Test\n\n')

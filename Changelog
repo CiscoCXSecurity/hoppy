@@ -1,4 +1,13 @@
-<1.6.0> - 19/06/2008 - Added -H flag which puts it into app only mode. This will only do tests with a corrct vhost
+<1.6.2> - 12/08/2008 - Added crossdomin.xml to list
+					   Added some more extraction data
+					   Changed Full test mode behaviour so no duplicated needed in request list
+					   Fixed --apponly cla
+
+<1.6.1> - 01/08/2008 - Fixed thread detection so it actually disables if python is built without threads
+					   Rearranges error messages so output is a little cleaner
+
+
+<1.6.0> - 19/06/2008 - Added -H flag which puts it into app only mode. This will only do tests with a corrcet vhost
 					   Added methods to test with a bad vhost name
 					   Fixed Proxy bug {It Didn't work!}
 
@@ -33,7 +42,7 @@
 <1.5.3> - 21/12/2007 - it's now multi threaded
 				       added data extract mode (2 in responce keywords)
 	 	      	       tweaked the output when erroring in test file
-				       fixed exception handling of CTRL-C to exit in vernose mode
+				       fixed exception handling of CTRL-C to exit in verbose mode
 				       better handling of a server dying in mid test
 
 <1.5.2> - 14/12/2007 - added proper IP parsing

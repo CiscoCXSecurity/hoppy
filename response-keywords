@@ -11,7 +11,7 @@
 #																
 #
 #
-# Supplied with hoppy 1.6.0 
+# Supplied with hoppy 1.6.2 
 
 
 Allow, 0
@@ -24,7 +24,7 @@ Vary, 0
 x-vermeer-rpc,1
 The user, 1
 <a:displayname>, 1
-XSSdetect, 1
+XSSdetect, 2
 TRACK, 1
 TRACE, 1
 Apache, 1
@@ -40,3 +40,7 @@ ETag:, 0
 google, 1
 Version Information:, 1
 password, 1
+80004005, 2
+X-Powered-By, 0
+MicrosoftSharePointTeamServices, 0
+allow-access-from, 2
