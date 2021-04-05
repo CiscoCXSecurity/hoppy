@@ -19,7 +19,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.6.4 
+	Version 1.7.0 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 """
 
-version = '1.6.4'
+version = '1.7.0'
 
 import socket, sys, getopt, time, os
 
@@ -83,8 +83,7 @@ if not nothreading:
 				finally:
    					disk.release() # release lock, no matter what				
 			self.testhost.tests.append(self.test)
-			pool_sema.release()   
-    
+			pool_sema.release()      
     
 __doc__ = '\n  hoppy ' + version + ' - (C) 2007 deanx\n\n' 
 __doc__ += '\t\t\t RID[at]Portcullis-Security.com\n\n' 
@@ -104,6 +103,7 @@ __doc__ += '\t -C config_file [--config=] \t\t\t (Load an alternative for /etc/h
 __doc__ += '\t -S file [--save=]\t\t\t\t (save output to file)\n'
 __doc__ += '\t -L file [--loop=]\t\t\t\t (loop around valid methods)\n'
 __doc__ += '\t -A [--apponly]\t\t\t\t\t (disable the host checks)\n'
+__doc__ += '\t -E [--nospider]\t\t\t\t (disable the auto spider)\n'
 __doc__ += '\t -s [--ssl]\t\t\t\t\t (use ssl)\n'
 __doc__ += '\t -n [--nossl]\t\t\t\t\t (disable ssl, takes precedence)\n'
 __doc__ += '\t -4 [--404]\t\t\t\t\t (do not supress 404\'s, 100\'s or 400 or 000 errors)\n'
@@ -153,31 +153,32 @@ def checkconfig(): # Check to make sure the config only conatins valid lines
 		print '\t[!] ' + str(errorsa) + ' Error(s) occured while parsing config file\n'
 	else:
 		print '\n\t\t[+] No errors were detected :-)\n'	
-	sys.exit(2)
+	sys.exit(0)
 
 
 def parsecmd(argv, connection):
-	global verbose, fof, config_file, methodsfile, keywordsfile, savefile, loopfile, maxthreads, nothreading, host, save
+	global verbose, fof, config_file, methodsfile, keywordsfile, savefile, loopfile, maxthreads, nothreading, host, save, spider
 	nossl = 0
 	portset = 0
 	check = 0
 	noproxy = 0
 	hset = 0
+	auth = ''
 	try:
-		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:H:k:4At:a:r:NS:L:T:", ["help","location=","file=", "host=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy","apponly", "config=", "save=", "loop=", "threads="])
+		opts, args = getopt.getopt(argv, "h:p:scnvl:f:o:H:k:4At:a:r:NS:L:T:E", ["help","location=","file=", "host=", "Host=", "port=", "ssl", "nossl", "verbose", "options=", "keywords=","check", "404", "timeout=", "auth=", "name=", "no-proxy","apponly", "config=", "save=", "loop=", "threads=", "nospider"])
 	except getopt.GetoptError, e:
 		usage()
 		print '\n\t[!] ' + str(e) + '\n'
-		sys.exit(2)
+		sys.exit(1)
 	for opt, arg in opts:
 		if opt == '--help':
 			usage()
-			sys.exit()
+			sys.exit(0)
 		elif opt in ("-h", "--host"):
 			connection.host = arg
 			hset = hset + 1
 		elif opt in ("-a", "--auth"):
-			connection.addAuth(arg)
+			auth = arg
 		elif opt in ("-r", "--name"):
 			connection.hostname = arg
 		elif opt in ("-p", "--port"):
@@ -185,6 +186,8 @@ def parsecmd(argv, connection):
 			portset = 1
 		elif opt in ('-s', '--ssl'):
 			connection.ssl = 1
+		elif opt in ('-E', '--nospider'):
+			spider = 0
 		elif opt in ('-n', '--nossl'):
 			nossl = 1
 		elif opt in ('-v', '--verbose'):
@@ -221,16 +224,19 @@ def parsecmd(argv, connection):
 			connection.host = arg
 			hset = hset + 1
 	if savefile:
-		save = opensavefile(savefile)		
+		save = opensavefile(savefile)
+		connection.save = save		
 	print2('\n[+] Configuring Test Environment\n')
 	if not hset:
 		print '\n\t[!] hostname (-h) is required\n'
 		usage()
-		sys.exit(2)
+		sys.exit(1)
 	if hset > 1:
 		print '\n\t[!] Make your mind up -h or -H (and only one of them!)\n'
 		usage()
-		sys.exit(2)
+		sys.exit(1)
+	if auth:
+		connection.addAuth(auth)
 	if check:
 		checkconfig()
 	if nossl:
@@ -243,7 +249,7 @@ def parsecmd(argv, connection):
 	if not connection.port.isdigit() or int(connection.port) > 65535 or int(connection.port) < 1:
 		print '\n\t[!] Supplied port \'' + connection.port + '\' is not a number or out of range 1-65535\n'
 		usage()
-		sys.exit(2)
+		sys.exit(1)
 			
 	proxy = os.getenv('HTTP_PROXY')
 	if proxy == None:
@@ -261,12 +267,12 @@ def parsecmd(argv, connection):
 			if not proxyport.isdigit() or int(proxyport) > 65535 or int(proxyport) < 1:
 				print '\n\t[!] Supplied Proxy port \'' + proxyport + '\' is not a number or out of range 1-65535\n'
 				usage()
-				sys.exit(2)
+				sys.exit(1)
 			connection.connection = (proxyhost, int(proxyport))
 		except ValueError, e:
 			print "\n\t[!] Check HTTP_PROXY format is http[s]://host:port\n"
 			usage()
-			sys.exit(2)
+			sys.exit(1)
 	else:
 		connection.connection = (connection.host, int(connection.port))
 
@@ -274,16 +280,17 @@ def parsecmd(argv, connection):
 	if not maxthreads.isdigit() or int(maxthreads) > 65535 or int(maxthreads) < 0:
 		print '  [!] Supplied thread count (-T ' + maxthreads + ') is not a number or out of range 1-65535\n'
 		usage()
-		sys.exit(2)
+		sys.exit(1)
 	elif int(maxthreads) == 0 or nothreading:
 		print2('\n\t[!] Threading is disabled\n')
+		maxthreads = str(1)
 		nothreading = 1
 	try:
 		connection.timeout = float(connection.timeout)
 	except:
 		print '\n\t[!] Supplied timeout (-t ' + connection.timeout + ') is not valid\n'
 		usage()
-		sys.exit(2)
+		sys.exit(1)
 		
 	
 def loadconfig(file): # read hoppy.conf file
@@ -332,7 +339,7 @@ def parsefile(file, name): #
 			print2(' - OK') 
 		except IOError, e:
 				print2(' - ' + str(e) + ', no methods file exiting\n\n')
-				sys.exit(2)
+				sys.exit(1)
 	for line in temp:
 		if line.find('#') == 0 or line.isspace() or len(line) == 0: # ignores comment lines and blank ones
 			continue
@@ -351,7 +358,7 @@ def opensavefile(file): #
 		out_file = open(file, "w")	
 	except IOError, e:
 		print '\n\t[!] Couldn\'t create ' + file + ' for writing\n'
-		sys.exit(2)
+		sys.exit(1)
 	return (out_file)
 	
 def openloopfile(file,text): #
@@ -365,7 +372,7 @@ def openloopfile(file,text): #
 			in_file.close()
 		except IOError, e:
 			print '\n\t[!] Couldn\'t find loop file  - ' + file + '\n'
-			sys.exit(2)
+			sys.exit(1)
 		for line in temp:
 			if line.find('#') == 0 or line.isspace() or len(line) == 0: # ignores comment lines and blank ones
 				continue
@@ -383,6 +390,17 @@ def openloopfile(file,text): #
 				continue
 			else:
 				newtext.append(line)			
+	return (newtext)
+
+def spiderLoop(loop, text):
+	newtext = []
+	errors = 0
+	for line in text:
+		if line.find('(loop)') >= 0:
+			for lreplace in loop:
+				newtext.append(line.replace('(loop)', lreplace))
+		else:
+			newtext.append(line)		
 	return (newtext)
 
 def removeHostStuff(text):
@@ -403,7 +421,7 @@ def removeHostStuff(text):
 
 	
 def checkConnection(connection):
-	global verbose
+	global verbose, ipaddr
 	head = hopclass.test('GET', 'GET (location)/(file) HTTP/1.1\r\nHost: (host):(port)\r\n\r\n')
 
 	if connection.proxyon:
@@ -412,7 +430,7 @@ def checkConnection(connection):
 		except socket.gaierror, e:
 			(num, name) = e
 			print '\n\t[!] Host Lookup Failure - ' + name + ' ' + connection.connection[0] + ' - Check HTTP_PROXY env variable\n\n'
-			sys.exit()
+			sys.exit(1)
 
 		print2('\n\t[+] Proxy Enabled on ' + connection.connection[0] + ':' + str(connection.connection[1]) + '\n')
 		#print2( '\n\t[+] Timout has been increased to ' + str(timeout)
@@ -429,7 +447,7 @@ def checkConnection(connection):
 			connection.ssl = 1
 		if len(head.result) > 1:
 			print2('\n\n\t[!] No response from the server, ' + head.result + ', maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n\n')
-			sys.exit(2)
+			sys.exit(1)
 		else:
 			print2(' - OK Data Recieved\n')
 		sys.stdout.flush
@@ -443,7 +461,7 @@ def checkConnection(connection):
 	except socket.gaierror, e:
 		(num, name) = e
 		print2('\n\t[!] Host Lookup Failure - ' + name + ' ' + connection.host + ' - Check hostname (-h)\n')
-		sys.exit()
+		sys.exit(1)
 	
 	print2('\n\t[+] Test host ' + connection.hostname + ' resolves to ' + ipaddr + '\n')
 	
@@ -453,24 +471,15 @@ def checkConnection(connection):
 		print2('\n\t[+] Testing Connection to ' + connection.hostname + ':' + str(connection.port))
 	sys.stdout.flush()
 	connection.send(head) # does a head request to check server is there and responding
-	
-	if connection.proxyon:
-		if not head.recieved[0].splitlines(): # or len(head.recieved) == 0:
-			print2('\n\n\t[!] No response from the server, maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n')
-			sys.exit(2)		
-	elif len(head.result) > 1:
-			print2('\n\n\t[!] No response from the server, ' + head.result + ', maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n')
-			sys.exit(2)
+	#if connection.proxyon:
+	if len(head.result) > 1:
+		print2('\n\n\t[!] No response from the server, ' + head.result + ', maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n')
+		sys.exit(1)
+	elif not head.recieved[0].splitlines(): # or len(head.recieved) == 0:
+		print2('\n\n\t[!] No response from the server, maybe it\'s an ssl connection or try increaseing timeout (-t)\n\n')
+		sys.exit(1)
 	print2( ' - OK Data Recieved\n')
 	sys.stdout.flush()
-	if connection.ssl:
-		print2('\n[+] Testing https://' + connection.hostname +':' + connection.port + ' [' + ipaddr + '] with '  + connection.location + '/' + connection.file + ' as webDAV location\n\n')
-	else:
-		print2('\n[+] Testing http://' + connection.hostname +':' + connection.port + ' [' + ipaddr + '] with '  + connection.location + '/' + connection.file + ' as webDAV location\n\n')
-
-	if not verbose:
-		print '\t[+] ',
-		sys.stdout.flush()
 
 
 # default option flags
@@ -486,7 +495,8 @@ fof = 0
 loopfile = ''
 maxthreads = '20'
 host = 1
-
+ipaddr = ''
+spider = 1
 # read command line and inport config files
 
 
@@ -495,28 +505,45 @@ try:
 	testhost = hopclass.connection()
 	parsecmd(sys.argv[1:], testhost)
 
-
 	text, errors = parsefile(methodsfile, 'Methods File')
 	keywords, errors2 = parsefile(keywordsfile, 'Keywords File')
 	errors = errors + errors2
 	if not host:
 		print2('\n\t[!] Running in App Only Mode\n')
 	text = removeHostStuff(text)
-	text = openloopfile(loopfile,text)
+	if not spider:
+		print2('\n\t[!] Spider is Disabled\n')
+	if loopfile:
+		text = openloopfile(loopfile,text)
 	if len(text) == 0:
 		print2('\n\t[!] No Valid Methods to Test\n\n')
-		sys.exit(2)
+		sys.exit(1)
 	if errors == 0:
 		print2('\n\t[+] Setup complete :-)\n')
 	else:
 		print2('\n\t[+] Configuration files Sucesfully Loaded\n')
 
 	print2('\n[+] Initialising Connection\n')
-	checkConnection(testhost)	 
+	checkConnection(testhost)
+	 
 except KeyboardInterrupt:
-	sys.exit(2)
-
+	sys.exit(1)
+	
+if spider and not loopfile:
+	print2("\n[+] Beginning spider with '/' and '" + testhost.location + "/" + testhost.file + "' as start points:\n")
+	testhost.spider(int(maxthreads))
+	#sys.exit()
 try:
+	if spider:
+		text = spiderLoop(testhost.dirs[1:], text)
+	if testhost.ssl:
+		print2('\n[+] Testing https://' + testhost.hostname +':' + testhost.port + ' [' + ipaddr + '] with '  + testhost.location + '/' + testhost.file + ' as webDAV location\n\n')
+	else:
+		print2('\n[+] Testing http://' + testhost.hostname +':' + testhost.port + ' [' + ipaddr + '] with '  + testhost.location + '/' + testhost.file + ' as webDAV location\n\n')
+
+	if not verbose:
+		print '\t[+] ',
+		sys.stdout.flush()
 	if nothreading:
 		for x in text:			# test methods from file
 			name, method = x.split(',',1)
@@ -553,15 +580,18 @@ except KeyboardInterrupt:
 				pass
 		except KeyboardInterrupt:
 			pass
-			
-if not verbose:
-		print2('\n\n\t[+] Done :-)')
+try:			
+	if not verbose:
+			print2('\n\n\t[+] Done :-)')
 
-testhost.summary()					
-testhost.exportSummary(sys.stdout, fof)
-if savefile:
-	testhost.exportSummary(save, 1)
+	testhost.summary()					
+	testhost.exportSummary(sys.stdout, fof)
+	if savefile:
+		testhost.exportSummary(save, 1)
 
-if testhost.errors and not fof:
-	print2('\n\t[+] ' + str(testhost.errors) + ' check(s) failed to return data, try incrreasing the socket timeout (-t) and re-run with the -4 switch for more information\n\n')
-sys.exit()
+	if testhost.errors and not fof:
+		print2('\n\t[+] ' + str(testhost.errors) + ' check(s) failed to return data, try incrreasing the socket timeout (-t) and re-run with the -4 switch for more information\n\n')
+	sys.exit(0)
+except KeyboardInterrupt:
+	print
+	sys.exit(1)

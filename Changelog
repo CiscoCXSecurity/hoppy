@@ -1,3 +1,12 @@
+<1.7.0> - 12/09/2008 - Added spider to general scanning to test for webdav on many directories
+					   Fixed bugs with regex matching
+					   Improved Handling of chunked server responces
+					   Added - to host name as
+					   Made the spider threaded
+					   Removed {extract} from verbose output
+					   added colour highlighting for data matching
+					   truncate line for path leakage improved 
+					  
 <1.6.4> - 21/08/2008 - Fixed bug with new host stuff as I forgot number is the regex
 
 <1.6.3> - 20/08/2008 - Added host parsing so that http://user:pass@domain.com:port/location/file.txt will get correctly parsed
@@ -31,7 +40,7 @@
 
 <1.5.8> - 03/04/2008 - fixed a bug with the check done when settign a port number
 
-<1.5.7> - 29/02/2008 - fixed bug in finding http-methods file if installed into a firrerent location
+<1.5.7> - 29/02/2008 - fixed bug in finding http-methods file if installed into a dirrerent location
 		   			   on the 29th just because i could
 
 <1.5.6> - 26/02/2008 - fixed some bugs in handling wierd server headers

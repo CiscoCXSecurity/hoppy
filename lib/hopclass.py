@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.6.4
+	Version 1.7.0
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -32,19 +32,72 @@
 import socket, re, base64, os, sys
 
 
-def higlightip(message):
+exclusion = [ "gif", "jpeg", "jpg", "jpe", "png", "vis", "tif", "tiff", "psd", "bmp", "ief", "wbmp", "ras", "pnm", "pbm", "pgm", "ppm", "rgb", "xbm", "xpm", "xwd", "djv", "djvu", "iw4", "iw44", "fif", "ifs", "dwg", "svf", "wi", "uff", "mpg", "mov", "mpeg", "mpeg2", "avi", "asf", "asx", "wmv", "qt", "movie", "ice", "viv", "vivo", "fvi", "tar", "tgz", "gz", "zip", "jar", "cab", "hqx", "arj", "rar", "rpm", "ace", "wav", "vox", "ra", "rm", "ram", "wma", "au", "snd", "mid", "midi", "kar", "mpga", "mp2", "mp3", "mp4", "aif", "aiff", "aifc", "es", "esl", "pac", "pae", "a3c", "pdf", "doc", "xls", "ppt", "mp", "msi", "rmf", "smi", "bin", "ps", "eps"] # array conating those extensions that we shoud not get when spidering
+
+def higlightip(message): # function to highlight IP addresses
 	messageip = regex.ip2.search(message).group()
 	message = message.replace(messageip, '\033[31m' + messageip + '\033[0;0m')
 	return message
 
-def highlightpath(message):
-	if regex.pathl.search(message):
+def highlightpath(message): # function to highlight internal paths
+	if regex.pathl.search(message): # are we linux
 		path = regex.pathl
 	else:
-		path = regex.pathw
+		path = regex.pathw # or are we windows
 	messagepath = path.search(message).group()
-	message = message.replace(messagepath, '\033[31m' + messagepath + '\033[0;0m')
+	message = message.replace(messagepath, '\033[34m' + messagepath + '\033[0;0m')
+	if len(message) > 130: # truncate if line is too long
+		char = message.lower().find(messagepath.lower())
+		beg = char - 65
+		if beg < 0:
+			beg = 0
+		end = beg + 130
+		return massage[beg:end]
 	return message
+
+def highlightkey(message, key):
+	#print message
+	char = message.lower().find(key.lower())
+	char2 = len(key)
+	if len(message) > 130: # truncate if length of line is too long
+		beg = char - 65
+		if beg < 0:
+			beg = 0
+		end = beg + 130
+		messageh = message[beg:char] + '\033[32m' + message[char:char+char2] + '\033[0;0m' + message[char+char2:end]
+	else:
+			messageh = message[:char] + '\033[32m' + message[char:char+char2] + '\033[0;0m' + message[char+char2:]
+	return messageh
+ 	
+
+
+nothreading = 0
+try:
+	import threading
+	from threading import Thread
+except ImportError, e:
+	nothreading = 1
+
+if not nothreading: # set up the thread class
+	class testit(Thread):
+		def __init__ (self,testhost,test, path):
+			Thread.__init__(self)
+			self.testhost = testhost 
+			self.test = test
+			self.path = path
+		
+		def run(self):
+
+			self.testhost.send(self.test)
+			self.test.getLinks()
+			self.testhost.disk.acquire() #only write to disk/screen and run processing on out own
+			try:
+			 self.testhost.parseLinks(self.test.links, self.path)
+			finally:
+   				self.testhost.disk.release() # release lock, no matter what				
+			self.testhost.pool_sema.release()   
+
+
 
 class connection: 
 	"Server Object"
@@ -70,115 +123,238 @@ class connection:
 		self.auth = []
 		self.authmethods = []
 		self.extract = []
+		self.locations = ["/"]
+		self.dirs = ["/"]
+		self.save = ''
+		self.actualfiles = {} # dictionary of parsed links
 		
-	def __finished(self, data, got, length): # check to see if we should wait for anymore data, return 0 on finish else length
-		if data.lower().find('transfer-encoding: chunked') >= 0: # Dirty!
-			if data.splitlines()[-2] == '0': # Dirtier but speeds things up !
-				return 0
-   			return length
+	def __finished(self, data, got, length): # check to see if we should wait for anymore data, return 0 on finish else length, -2 if chunked
+		if got > 500000: # drop out if we fetch more than 500K
+			return 0
+		if data.lower().find('transfer-encoding: chunked') >= 0 or length == -2: # Dirty!
+			try:
+				if data.splitlines()[-2] == '0': # Dirtier but speeds things up! finds the last line of chunk decoded data
+					return 0
+			except IndexError: 
+				pass
+   			return -2
 		elif length < 0 and data and data.splitlines()[0].lower().find('http') == 0: # Get Content Length
-			for content in data.splitlines():
+			for content in data.splitlines(): # process a line at a time
 				if content.lower().find('content-length') == 0:
 					hhh = content.split(':')
-					length = int(hhh[1])
+					try:
+						length = int(hhh[1]) # assign the content length
+					except ValueError: # need this but not sure why had an error during testing but clause never met, thinks it a thread thing
+						pass
 					#print 'found length ' + str(length) + ' got so far ' + str(got) 
 					break
-		if (length > 0 and got < length):
+		if (length > 0 and got < length): # detect if we have downloaded less than the content length
 			return length
-		if not data or len(data.splitlines()[-1]) == 0 or (length > 0 and got > length):
+		if not data or len(data.splitlines()[-1]) == 0 or (length > 0 and got > length): # have we finished then?
 			return 0
 		return length
-
-
+	
+	def print2(self, text): # write to screen and disk
+		print text,
+		if self.save:
+			self.save.write(text)
+			self.save.flush()
+	
+	def parseLinks(self, links, path): # check for unique links 
+		for link in links: 
+			if link[-1] == '/' and len(link) > 1: # are we a directory?
+				end = '/'
+			else:
+				end = ''
 				
-	def exportSummary(self, file, fof):
+			if link[0] == '/': # are we relative?
+				link = os.path.normpath(link) + end
+			else:
+				link = os.path.normpath(path + link) + end
+			
+			if len(self.locations) > 1000: # or we have toooo many links anyhow
+				break
+			
+			l =  link.split('?')[0] # make sure we are not recursivly getting session based gets
+			if link != l: 
+				num = self.actualfiles.get(l, 0)
+				if num > 15: # break if we have seen this link alot
+					break
+				self.actualfiles.update({l:num+1}) # update the score
+					
+			if link not in self.locations: # and link != '//':
+				if link.split(".")[-1].lower not in exclusion: # check extension
+					self.locations.append(link)
+				linkpath = os.path.dirname(link)
+				if linkpath not in self.dirs: # and len(linkpath) >1:
+					comp = linkpath.split('/')
+					compbuild = ''
+					for part in comp[1:]: # only use part to remove excess /'s, recursivly build directory tree so we set it all
+						compbuild = compbuild + '/' + part
+						if compbuild not in self.dirs:
+							self.dirs.append(compbuild)
+							self.print2("\n\t\t" + compbuild + "/")
+	
+	def spider(self, threads): # spider method on server
+
+		if self.proxyon and not self.ssl:
+			gent = 'GET http://(realhost):(port)(location) HTTP/1.1\r\nHost: (host)\r\n(auth)\r\n\r\n'
+		else:
+			gent = 'GET (location) HTTP/1.1\r\nHost: (host)\r\n(auth)\r\n\r\n'
+
+		# parse the output and get out all links
+		# add full file + path to location and dirs to dirs if not it etc...
+		# loop around the locations stack to get all files and parse out locations
+		# lets not get jpg, pdf, tiff etc but hey
+		# also recursive loop gets need to be fixed!
+		# print out new dirs when found
+		# do we thread this bit?
+		
+		self.locations.append(self.location + "/" + self.file) # add spider start
+		try:		
+			if threads == 1: # non threaded run
+				visited = 0
+				for loc in self.locations:
+					path = os.path.dirname(loc) + "/"
+					if path == '//':
+						path = '/'
+					req = gent.replace('(location)',loc)
+					reqo = test('GET', req)
+					self.send(reqo)
+					reqo.getLinks()
+					self.parseLinks(reqo.links, path)
+
+			else: # we are threaded
+				self.disk = threading.Lock()
+				self.pool_sema = threading.BoundedSemaphore(threads)
+				visited = 0
+				while len(self.locations) > visited: # need to wait till all threads are done before we decide if we have finished
+					for loc in self.locations[visited:]:			# test methods from file
+						path = os.path.dirname(loc) + "/"
+						if path == '//':
+							path = '/'
+						req = gent.replace('(location)',loc) # build new request
+						reqo = test('GET', req)
+						self.pool_sema.acquire() # block till we have a new thread
+						current = testit(self, reqo, path)
+						current.start() # non blocking start to threads
+						visited += 1
+					while (threading.activeCount() > 1):
+						pass
+											
+			if len(self.dirs) > 0:
+				self.print2("\n\n\t[+] Spider Completed :-)")
+				self.print2("\n\n\t[+] Found " + str(len(self.dirs)-1) + " directories for testing\n")
+			else:
+				self.print2("\n\t[+] Spider Completed :-)\n")
+				self.print2("\n\t[!] Nothing Found, sorry\n")
+							
+		except KeyboardInterrupt:	
+			self.print2('\n\n\t[!] Waiting for Threads to Finish ;-)\n')
+			try:
+				while (threading.activeCount() > 1): # wait for all the threads to finish
+					pass
+			except KeyboardInterrupt:
+				pass
+			if len(self.dirs) > 0:
+				self.print2("\n\n\t[!] Premature End to the spider")
+				self.print2("\n\n\t[+] Found " + str(len(self.dirs)-1) + " directories for testing\n")
+			else:
+				self.print2("\n\t[+] Premature End to the spider\n")
+				self.print2("\n\t[!] Nothing Found, sorry\n")
+		return
+				
+	def exportSummary(self, file, fof): # print the summary 
 		file.write('\n\n[+] Summary of Findings\n')
 		types = []
 		ignorecodes = [404, 100, 000, 301, 400]		
 
 		for check in self.tests:
 			for rescode in check.resline:
-				if (check.name + ',' + rescode[1]) not in types:
-					if not (ignorecodes.count(rescode[0]) or check.name == "Info") or fof:
-						sys.stdout.flush()
+				if (check.name + ',' + rescode[1]) not in types: # check for duplicates
+					if not (ignorecodes.count(rescode[0]) or check.name[:4] == "Info") or fof: # are we -4 or not ignoring it
+						#sys.stdout.flush()
 						types.append(check.name + ',' + rescode[1])
-		if len(types) > 0:
+		if len(types) > 0: # print method repsonces
 			types.sort()
 			file.write('\n\t[+] Method Responses:\n')
 			for data in types:
 				name, got = data.split(',', 1)
 				file.write('\n\t\t%-25s -\t %s' % (name, got))
-		if len(self.leak) > 0: 
+		if len(self.leak) > 0: # print infrmation leakage
 			file.write('\n\n\t[+] Information Leakage:\n')	
 			for data in self.leak:
-				file.write('\n\t\t' + data[:115])
-		if len(self.ipleak) > 0: 
+				file.write('\n\t\t' + data)
+		if len(self.ipleak) > 0: # print IP leakage
 			file.write('\n\n\t[+] IP Leakage:\n')	
 			for data in self.ipleak:
-				iph = higlightip(regex.ips.search(data).group())
+				iph = higlightip(regex.ips.search(data).group()) # highlight IP address
 				file.write('\n\t\t' + iph)
-		if len(self.pathleak) > 0: 
+		if len(self.pathleak) > 0: # print path leakage
 			file.write('\n\n\t[+] PATH Leakage:\n')	
 			for data in self.pathleak:
 				pathh = highlightpath(data)
-				file.write('\n\t\t' + pathh[:115])
-		if len(self.authmethods) > 0:
+				file.write('\n\t\t' + pathh)
+		if len(self.authmethods) > 0: # print auth leakage
 			file.write('\n\n\t[+] Avaliable Auth Methods:\n\n\t\t' + str(self.authmethods))
-		if len(self.auth) > 0:
+		if len(self.auth) > 0: 
 			file.write('\n\n\t[+] AUTH Leakage:\n')	
 			for data in self.auth:
 				file.write('\n\t\tBase64 Decode: ' + data)
-		if len(self.extract) > 0:
+		if len(self.extract) > 0: # print extracted data
 			file.write('\n\n\t[+] Extracted Data:\n')	
 			for data in self.extract:
 				file.write('\n\t\t' + data)
 		file.write('\n\n')
 				
-	def summary(self):
+	def summary(self): # summarise all the tests we performed
 		for job in self.tests:
 			for resp in job.summary:
-				resp = resp.strip()								# Find all matching headers and print once
-				if resp not in self.auth and resp.lower().find('www-authenticate') == 0 or resp.lower().find('proxy-authenticate') == 0: # bas64decode the NTLM header
-					if resp.split()[1] not in self.authmethods:
-						if resp.split()[1] == 'Negotiate' and 'NTLM' not in self.authmethods:
+				resp = resp.strip()	# Find all matching headers and print once
+				auth = 0 
+				if resp.lower().find('www-authenticate') == 0 or resp.lower().find('proxy-authenticate') == 0: # bas64decode the NTLM header
+					auth = 1
+					authmeth = resp.split()[1]
+					if authmeth not in self.authmethods: 
+						if authmeth == 'Negotiate' and 'NTLM' not in self.authmethods: # only add one
 							self.authmethods.append('NTLM')
-						elif resp.split()[1] != 'Negotiate':	
-							self.authmethods.append(resp.split()[1])
+						elif authmeth != 'Negotiate':	# add all others
+							self.authmethods.append(authmeth)
 					try:
-						all = resp.split()[2]
-						machine = base64.b64decode(all)[56:]
-						if machine not in self.auth and all.find('TlRMT') == 0:
+						all = resp.split()[2] # try to extract machine/domain data
+						machine = base64.b64decode(all)[56:] # only get a bit of the string
+						if machine not in self.auth and all[:5] == "TlRMT": # we got a good decode
 							self.auth.append(machine)			 # Append leak text
 					except TypeError:
 						pass
 					except IndexError:
 						pass
-				#auth.append(resp)
-				if resp.find('{extract}') == 0:
+				if resp.find('{extract}') == 0: # detect and append extracted data
 					resp = resp.replace('{extract}', '')
 					if resp not in self.extract:
 						self.extract.append(resp)
 					continue
-				if resp not in self.pathleak and (regex.pathl.search(resp) or regex.pathw.search(resp)):
+				if resp not in self.pathleak and (regex.pathl.search(resp) or regex.pathw.search(resp)): # append path leakage
 					self.pathleak.append(resp)
-				if resp not in self.ipleak and regex.matchip(resp):
+				if resp not in self.ipleak and regex.matchip(resp): # append ip leakage
 					self.ipleak.append(resp)
-				if resp[:115] not in self.leak and resp not in self.ipleak and resp not in self.pathleak and resp not in self.extract and resp not in self.auth:
-					self.leak.append(resp[:115])
+				if not auth and resp not in self.leak and resp not in self.ipleak and resp not in self.pathleak and resp not in self.extract and resp not in self.auth:
+					self.leak.append(resp) # append other stuff
 		self.leak.sort()	
 	
-	def addAuth(self, auth):
+	def addAuth(self, auth): # create and add basic auth
 		print '\n\t[+] Adding Basic Auth of "' + auth + '"'
 		self.b64auth = base64.encodestring(auth)
 	
-	def removessl(self):
+	def removessl(self): # nossl
 		self.nossl = 1
+		
 	def removeproxy(self):
 		self.noproxy = 1
 		
 	def checkConfig(self):
 		
-		h = regex.host.match(self.host)
+		h = regex.host.match(self.host) # extract the information from the passed -h flag
 		protocol = h.group(1)
 		auth = h.group(3)
 		host = h.group(4)
@@ -211,88 +387,88 @@ class connection:
 				self.port = '80'	
 			
 		
-	def send(self, test):
+	def send(self, test): # send the test
 		timedout = 0
 		returnbuff = []
 		text = test.method
-		connecthead = 'CONNECT ' + self.host + ':' + self.port + ' HTTP/1.1\r\nHost: ' + self.hostname + ':' + self.port + '\r\n\r\n'
+		connecthead = 'CONNECT ' + self.host + ':' + self.port + ' HTTP/1.0\r\nHost: ' + self.hostname + ':' + self.port + '\r\n\r\n'
 		#connecthead = 'CONNECT ' + test.name + ' HTTP/1.1\r\nHost: ' + test.name + '\r\n\r\n'
-		text = text.replace('(host)',self.hostname)
+		text = text.replace('(host)',self.hostname) # replace the place holders
 		text = text.replace('(realhost)',self.host)
 		text = text.replace('(port)',self.port)
+		text = text.replace('\\n','\r\n')
 		if self.b64auth:
 			text = text.replace('(auth)','Authorization: Basic ' + self.b64auth)
 		else:
-			text = text.replace('(auth)\\n','')
+			text = text.replace('(auth)\r\n','')
 		text = text.replace('(location)',self.location)
 		text = text.replace('(file)',self.file)
-		text = text.replace('\\n','\r\n')
 		split = text.split('(wait)')
 		test.sent = split
 		data = ''
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # open the socket
 		length = 0
 		try:
-			#s.connect((host, int(port)))
 			s.connect(self.connection)
 			if self.ssl: # do it over ssl
 				if self.proxyon:
 					s.send(connecthead)
 					data = s.recv(8192)
 				ssl_sock = socket.ssl(s)
-				for line in split:
+				for line in split: # if we a re multi stage request then send all of them
+					timedout = 0
 					ssl_sock.write(line)
 					s.settimeout(self.timeout)
 					total_data = []
 					length = -1
-					while True:
+					while True: # keep looping till timeout or finished
 						try:
 							data = ssl_sock.read()
 						except socket.error:
 							#print 'timeout'
 							break
 						total_data.append(data)
-						length = self.__finished(data, len(''.join(total_data)), length)
+						length = self.__finished(data, len(''.join(total_data)), length) # detect a finished connection
 						#print length
 						if not length:
 							break
-					returnbuff.append(''.join(total_data))
-				del ssl_sock
+					returnbuff.append(''.join(total_data)) # add the data to the buffer
+				del ssl_sock # remove ssl socket
 			else: # do it over plain http
-				for line in split:
+				for line in split: # if we a re multi stage request then send all of them
+					timedout = 0
 					s.send(line)
 					total_data = []
 					s.settimeout(self.timeout)
 					length = -1
-					while True:
+					while True: # keep looping till timeout or finished
 						try:
 							data = s.recv(8192)
 						except socket.error,e:
 							timedout = 1
 							break
 						total_data.append(data)					
-						length = self.__finished(data, len(''.join(total_data)), length)
+						length = self.__finished(data, len(''.join(total_data)), length) # detect a finished conection
 						#print length
 						if not data or not length:
 							break
 					returnbuff.append(''.join(total_data))
 			if timedout:
-				test.result = '!'
+				test.result = '!' # we timed out rather than completed
 			else:
-				test.result = '.'
+				test.result = '.' # good we did it
 					
-		except socket.error, e:
+		except socket.error, e: # oh dear something went wrong
 			(num, name) = e
-			#print '\n\t[!] Host Lookup Failure - ' + name + ' - Check hostname (-h)'
 			test.result = name
 		s.close()
-	 	test.recieved = returnbuff
+	 	test.recieved = returnbuff # tell the caller what happended
 		
 	#sys.exit(2)
 
-class test:
+class test: # test class
 
-	def __init__(self, name, method):
+	def __init__(self, name, method): 
 		self.name = name
 		self.method	= method
 		self.recieved = ''
@@ -300,14 +476,16 @@ class test:
 		self.result = ''
 		self.resline = []
 		self.summary = []
+		self.links = []
 	
 	
-	def summarise(self, keywords):
+	def summarise(self, keywords): # parse the repsonce and extract the data we want
+		authmatch = ["-Authenticate","TlRMTVNTUAA"]
 		if self.recieved:
 			for line in self.recieved:
 				allow = line.splitlines()
-				if (allow):
-					match = regex.p.search(allow[0])							# match a server code 
+				if allow:
+					match = regex.p.search(allow[0])	# match a server code 
 					if match:			# Append Server Response
 						code = int(match.group())
 					else:
@@ -317,25 +495,30 @@ class test:
 						x = x.lstrip().rstrip()
 						if regex.matchip(x) or regex.pathw.search(x) or regex.pathl.search(x) and x not in self.summary:	# match an ip address and add
 							self.summary.append(x)
-						else: 
+						else:
+							for y in authmatch:
+								n = x.lower()[:20].find(y.lower())
+								if n >= 0 and x not in self.summary: # n <10 cause for some reason we 
+									self.summary.append(x)
+									break
 							for y in keywords:	# try matching keywords from file 
 								name, method = y.split(',', 1)
-								if ((x.find(name) >= 0 and int(method)) or x.find(name) == 0) and x not in self.summary:
+								if ((x.lower().find(name.lstrip().rstrip().lower()) >= 0 and int(method)) or x.lower().find(name.lstrip().rstrip().lower()) == 0) and x not in self.summary:
 									if (int(method) == 2):
-										self.summary.append('{extract}' + self.name + ':\t\t ' + x)
+										self.summary.append('{extract}' + self.name + ':\t\t ' + highlightkey(x, name))
 									else:
-										self.summary.append(x)
-				else:
+										self.summary.append(highlightkey(x, name))
+				else: # we got no data back so something went wrong!
 					self.resline.append([000,'HTTP/1.1 000 This Test Falied!'])
 					return 1
 		return 0
 		
 
-	def export(self, file, verbose):
+	def export(self, file, verbose): # put the test data to screen and/or disk
 		
 		i = 0
 		if verbose >= 2: # print the sent and recievned if we are in verbose mdoe.
-			for line in self.sent:
+			for line in self.sent: # print the test data
 				if verbose > 2:
 					file.write('\n\nWe Sent:\n\n' + line + '\n')
 					if len(self.recieved) > i:
@@ -346,6 +529,7 @@ class test:
 			for res in self.resline:
 				file.write('\n\t\t' + self.name + ': ' + res[1] + '\n')
 			for sum in self.summary:
+				sum = sum.replace('{extract}', '')
 				file.write('\n\t\t\t' + sum + '\n')
 		elif len(self.result) == 1:
 			file.write(self.result)
@@ -353,6 +537,23 @@ class test:
 			file.write('\n\t[!] ' + self.result)
 		file.flush()
 
+	def getLinks(self): # parse out the links from a repoonse 
+		if self.recieved:
+			for line in self.recieved:
+				if (line):
+					h = regex.link.findall(line) # find all links in page
+					for l in h:
+						link = ''
+						if l[3]:
+							link = regex.host2.match(l[3])
+						if not link:
+							link=regex.host2.match(l[2])
+						if link:
+							self.links.append(link.group(3))
+		#for a in self.links:
+		#	print "Link: " + str(a)			
+		return		
+		
 
 class Callable:
     def __init__(self, anycallable):
@@ -361,12 +562,16 @@ class Callable:
 class regex:
 
 	p = re.compile(' \d\d\d ')											# regex for matching server responce code
-	ip = re.compile('(\d{1,}\.){3}\d{1,}')				# regex to match ip addresses
+	ip = re.compile('(\d{1,}\.){3}\d{1,}')								# regex to match ip addresses
 	ip2 = re.compile('(\d{1,3}\.){3}\d{1,3}')							# regex to match ip addresses
 	ips = re.compile('.{0,60}(\d{1,3}\.){3}\d{1,3}.{0,60}') 			# regex to isoloate IP address
-	pathw = re.compile('[A-z]:\\\\([^\\\\]*\\\\){0,10}')				# regex to match windows filename
-	pathl = re.compile('/([^/]*/){0,10}w[we][wb]root/([^/]*/){0,10}')	# regex to match linux filename		
-	host = re.compile('^(https?://)?((\S*:\S*)@)?([A-z0-9.]*)(:(\d+))?((/\S*)?/(\S*.\S*)?)?', re.I)
+	pathw = re.compile('[A-z]:\\\\([^\\\\]+\\\\){0,10}')				# regex to match windows filename
+	pathl = re.compile('/([^/]*/){0,10}(www|web)root/([^/]*/){0,10}')	# regex to match linux filename		
+	host = re.compile('^(https?://)?((\S+:\S+)@)?([A-z0-9.-]+)(:(\d+))?((/\S*)?/(\S*))?', re.I)
+	host2 = re.compile('^((ftp|http|news)s?://[^/]+)?(/?[^:[*#\s>]+)', re.I)
+	dir2 = re.compile('^((/\S*)/)')
+	link = re.compile('((src|href|action|location)\s*=\s*[\'"]?\s*([^>\'"]*)\s*[\'"]?)|location:\s(\S*)', re.I)
+
 
 	def matchip(IP):
 		
@@ -380,12 +585,7 @@ class regex:
 			return 1
 		return 0
 	
-	matchip = Callable(matchip) 		
-
-	
-		
-
-		
+	matchip = Callable(matchip) 			
 		
 		
 		

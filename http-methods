@@ -12,7 +12,7 @@
 # (auth) will be replaced by the basic auth credentials if supplied
 # (loop) will be replaced in a loop with all entries in the loop file 
 # 
-# Supplied with hoppy 1.6.4 
+# Supplied with hoppy 1.7.0 
 
 
 # Base Case Analysis
@@ -107,13 +107,13 @@ Copy, COPY (location)/(file).copy HTTP/1.1\nHost: (host)\n(auth)\nDestination: h
 
 Propfind, PROPFIND (location)/ HTTP/1.1\nHost:\n(auth)\nContent-Length: 0\n\n
 Propfind, PROPFIND (location)/ HTTP/1.1\nHost: (host)\n(auth)\nContent-Length: 0\n\n
-Propfind, PROPFIND / HTTP/1.1\nHost: (host)\n(auth)\nContent-Length: 0\n\n
-Propfind, PROPFIND /images HTTP/1.1\nHost:\n(auth)\nContent-Length: 0\n\n
-Propfind, PROPFIND /images HTTP/1.1\nHost: (host)\n(auth)\nContent-Length: 0\n\n
-Propfind, PROPFIND (location)/(file) HTTP/1.1\nhost: (host)\n(auth)\nDepth: 1\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 143\nTranslate: f\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<propfind xmlns="DAV:">\n<prop>\n<checked-in />\n<checked-out />\n</prop>\n<dead-props />\n</propfind>\n\n
-Propfind, PROPFIND (location)/ HTTP/1.1\nhost: (host)\n(auth)\nDepth: 1\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 143\nTranslate: f\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<propfind xmlns="DAV:">\n<prop>\n<checked-in />\n<checked-out />\n</prop>\n<dead-props />\n</propfind>\n\n
-Proppatch, PROPPATCH (location)/(file) HTTP/1.1\nHost: (host)\n(auth)\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 300\nTranslate: F\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<D:propertyupdate xmlns:D="DAV:" xmlns:Z="http://www.w3.com/standards/z39.50/">\n<D:set>\n<D:prop>\n<Z:authors>\n<Z:Author>deanx</Z:Author>\n</Z:authors>\n</D:prop>\n</D:set>\n<D:remove>\n<D:prop><Z:Copyright-Owner/></D:prop>\n</D:remove>\n</D:propertyupdate>\n\n
-Proppatch, PROPPATCH (location)/ HTTP/1.1\nHost: (host)\n(auth)\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 300\nTranslate: F\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<D:propertyupdate xmlns:D="DAV:" xmlns:Z="http://www.w3.com/standards/z39.50/">\n<D:set>\n<D:prop>\n<Z:authors>\n<Z:Author>deanx</Z:Author>\n</Z:authors>\n</D:prop>\n</D:set>\n<D:remove>\n<D:prop><Z:Copyright-Owner/></D:prop>\n</D:remove>\n</D:propertyupdate>\n\n
+Propfind /, PROPFIND / HTTP/1.1\nHost: (host)\n(auth)\nContent-Length: 0\n\n
+Propfind /images, PROPFIND /images HTTP/1.1\nHost:\n(auth)\nContent-Length: 0\n\n
+Propfind /images, PROPFIND /images HTTP/1.1\nHost: (host)\n(auth)\nContent-Length: 0\n\n
+Propfind (location)/(file), PROPFIND (location)/(file) HTTP/1.1\nhost: (host)\n(auth)\nDepth: 1\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 143\nTranslate: f\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<propfind xmlns="DAV:">\n<prop>\n<checked-in />\n<checked-out />\n</prop>\n<dead-props />\n</propfind>\n\n
+Propfind (location)/, PROPFIND (location)/ HTTP/1.1\nhost: (host)\n(auth)\nDepth: 1\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 143\nTranslate: f\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<propfind xmlns="DAV:">\n<prop>\n<checked-in />\n<checked-out />\n</prop>\n<dead-props />\n</propfind>\n\n
+Proppatch (location)/(file), PROPPATCH (location)/(file) HTTP/1.1\nHost: (host)\n(auth)\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 300\nTranslate: F\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<D:propertyupdate xmlns:D="DAV:" xmlns:Z="http://www.w3.com/standards/z39.50/">\n<D:set>\n<D:prop>\n<Z:authors>\n<Z:Author>deanx</Z:Author>\n</Z:authors>\n</D:prop>\n</D:set>\n<D:remove>\n<D:prop><Z:Copyright-Owner/></D:prop>\n</D:remove>\n</D:propertyupdate>\n\n
+Proppatch (location)/, PROPPATCH (location)/ HTTP/1.1\nHost: (host)\n(auth)\nContent-Type: text/xml\nExpect: 100-continue\nContent-Length: 300\nTranslate: F\n\n(wait)<?xml version="1.0" encoding="utf-8" ?>\n<D:propertyupdate xmlns:D="DAV:" xmlns:Z="http://www.w3.com/standards/z39.50/">\n<D:set>\n<D:prop>\n<Z:authors>\n<Z:Author>deanx</Z:Author>\n</Z:authors>\n</D:prop>\n</D:set>\n<D:remove>\n<D:prop><Z:Copyright-Owner/></D:prop>\n</D:remove>\n</D:propertyupdate>\n\n
 
 # Auth tests
 
