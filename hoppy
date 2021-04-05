@@ -13,13 +13,13 @@
 	
 		http://www.ngssoftware.com/papers/iisrconfig.pdf	
 			
-	Usage : hoppy -h <[http[s]://]hostname[:port]> [options]
+	Usage : hoppy -h <[http[s]://][user:pass@]hostname[:port][/location/file.txt]> [options]
 		
 	example: http_options.py -h www.google.com -p 80 -vv
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.6.2 
+	Version 1.6.3 
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -37,9 +37,9 @@
 
 """
 
-version = '1.6.2'
+version = '1.6.3'
 
-import socket, sys, getopt, time
+import socket, sys, getopt, time, os
 
 nothreading = 0
 try:
@@ -88,7 +88,7 @@ if not nothreading:
     
 __doc__ = '\n  hoppy ' + version + ' - (C) 2007 deanx\n\n' 
 __doc__ += '\t\t\t RID[at]Portcullis-Security.com\n\n' 
-__doc__ += '  Usage: ' + sys.argv[0] +' -h <[http[s]]://hostname[:port]> [options]\n\n'
+__doc__ += '  Usage: ' + sys.argv[0] +' -h <[http[s]://][user:pass@]hostname[:port][/location/][file.txt]> [options]\n\n'
 __doc__ += '\t -h [http[s]]://]hostname[:port] [--host=]\t (required or -H)\n'
 __doc__ += '\t -H [http[s]]://]hostname[:port] [--Host=]\t (app only, shortcut for -h host -A)\n'
 __doc__ += '\t -p port [--port=]\t\t\t\t (default 80)\n'
@@ -174,7 +174,7 @@ def parsecmd(argv, connection):
 			usage()
 			sys.exit()
 		elif opt in ("-h", "--host"):
-			connection.host = arg.lower()
+			connection.host = arg
 			hset = hset + 1
 		elif opt in ("-a", "--auth"):
 			connection.addAuth(arg)
@@ -218,7 +218,7 @@ def parsecmd(argv, connection):
 			host = 0
 		elif opt in ('-H', '--Host'):
 			host = 0
-			connection.host = arg.lower()
+			connection.host = arg
 			hset = hset + 1
 	if savefile:
 		save = opensavefile(savefile)		
@@ -238,12 +238,39 @@ def parsecmd(argv, connection):
 	if noproxy:
 		connection.removeproxy()
 	if portset:
-		if not port.isdigit() or int(port) > 65535 or int(port) < 1:
-			print '\n\t[!] Supplied port (-p ' + port + ') is not a number or out of range 1-65535\n'
-			usage()
-			sys.exit(2)
 		connection.port = port
 	connection.checkConfig()
+	if not connection.port.isdigit() or int(connection.port) > 65535 or int(connection.port) < 1:
+		print '\n\t[!] Supplied port \'' + connection.port + '\' is not a number or out of range 1-65535\n'
+		usage()
+		sys.exit(2)
+			
+	proxy = os.getenv('HTTP_PROXY')
+	if proxy == None:
+		proxy = os.getenv('http_proxy')
+	if proxy != None and not connection.noproxy:
+		connection.proxyon = 1
+		print '\n\t[+] Proxy Enabled'
+		#timeout = timeout * 5
+		if proxy.find('http://') == 0:
+			proxy = proxy.replace('http://', '')
+		elif proxy.find('https://') == 0:
+			proxy = proxy.replace('https://', '')
+		try:
+			proxyhost, proxyport = proxy.split(':', 1)
+			if not proxyport.isdigit() or int(proxyport) > 65535 or int(proxyport) < 1:
+				print '\n\t[!] Supplied Proxy port \'' + proxyport + '\' is not a number or out of range 1-65535\n'
+				usage()
+				sys.exit(2)
+			connection.connection = (proxyhost, int(proxyport))
+		except ValueError, e:
+			print "\n\t[!] Check HTTP_PROXY format is http[s]://host:port\n"
+			usage()
+			sys.exit(2)
+	else:
+		connection.connection = (connection.host, int(connection.port))
+
+
 	if not maxthreads.isdigit() or int(maxthreads) > 65535 or int(maxthreads) < 0:
 		print '  [!] Supplied thread count (-T ' + maxthreads + ') is not a number or out of range 1-65535\n'
 		usage()

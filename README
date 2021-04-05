@@ -1,5 +1,5 @@
 
-[H]ttp [O]ptions [P]rober in [PY]thon - 1.6.2 
+[H]ttp [O]ptions [P]rober in [PY]thon - 1.6.3 
 
 This is hoppy, a http method prober, it is a python script which tests http methods for configuration issues leaking information or just to see if they are enabled.
 
@@ -52,7 +52,7 @@ Having a large number of failed tests is not a great concern as sometimes these 
 == Usage == 
 
 
-  Usage: /usr/local/bin/hoppy -h <[http[s]]://hostname[:port]> [options]
+  Usage: /usr/local/bin/hoppy -h <[http[s]://][user:pass@]hostname[:port][/location/][file.txt]> [options]
 
          -h [http[s]]://]hostname[:port] [--host=]       (required or -H)
          -H [http[s]]://]hostname[:port] [--host=]       (app only, shortcut for -h host -A)

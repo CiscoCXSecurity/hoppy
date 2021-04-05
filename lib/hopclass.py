@@ -10,7 +10,7 @@
 	
 	Copyright (C) 14/03/2007 - deanx <RID[at]portcullis-secuirty.com>
 	
-	Version 1.6.2
+	Version 1.6.3
 	
 	* This program is free software; you can redistribute it and/or modify
 	* it under the terms of the GNU General Public License as published by
@@ -168,6 +168,7 @@ class connection:
 		self.leak.sort()	
 	
 	def addAuth(self, auth):
+		print '\n\t[+] Adding Basic Auth of "' + auth + '"'
 		self.b64auth = base64.encodestring(auth)
 	
 	def removessl(self):
@@ -176,21 +177,31 @@ class connection:
 		self.noproxy = 1
 		
 	def checkConfig(self):
-	
-		if self.host.find('http://') == 0:
-			self.host = self.host.replace('http://', '')
-		elif self.host.find('https://') == 0:
-			self.host = self.host.replace('https://', '')
+		
+		h = regex.host.match(self.host)
+		protocol = h.group(1)
+		auth = h.group(3)
+		host = h.group(4)
+		port = h.group(6)
+		location = h.group(8)
+		file = h.group(9)
+		if auth:
+			self.addAuth(auth)	
+		if protocol and protocol.lower() == 'https://':
 			if not self.nossl:
 				self.ssl = 1
 			if not self.port:
 				self.port = '443'	
-		if self.host.find(':') >= 0:
-			self.host, self.port = self.host.split(':', 1)
-			
+		if port:
+			self.port = port
+		if location:
+			self.location = location
+		if file:
+			self.file = file	
+		self.host = host
+				
 		if self.port == str(443) and not self.nossl:
 			self.ssl = 1
-		self.host = self.host.split('/',1)[0]
 		if not self.hostname:
 			self.hostname = self.host
 		if not self.port:
@@ -198,25 +209,7 @@ class connection:
 				self.port = '443'
 			else:	
 				self.port = '80'	
-		proxy = os.getenv('HTTP_PROXY')
-		if proxy == None:
-			proxy = os.getenv('http_proxy')
-		if proxy != None and not self.noproxy:
-			self.proxyon = 1
-			print '\n\t[+] Proxy Enabled'
-			#timeout = timeout * 5
-			if proxy.find('http://') == 0:
-				proxy = proxy.replace('http://', '')
-			elif proxy.find('https://') == 0:
-				proxy = proxy.replace('https://', '')
-			try:
-				proxyhost, proxyport = proxy.split(':', 1)
-				self.connection = (proxyhost, int(proxyport))
-			except ValueError, e:
-				print "\n  Check HTTP_PROXY format is http[s]://host:port\n"
-				sys.exit(2)
-		else:
-			self.connection = (self.host, int(self.port))
+			
 		
 	def send(self, test):
 		timedout = 0
@@ -373,7 +366,7 @@ class regex:
 	ips = re.compile('.{0,60}(\d{1,3}\.){3}\d{1,3}.{0,60}') 			# regex to isoloate IP address
 	pathw = re.compile('[A-z]:\\\\([^\\\\]*\\\\){0,10}')				# regex to match windows filename
 	pathl = re.compile('/([^/]*/){0,10}w[we][wb]root/([^/]*/){0,10}')	# regex to match linux filename		
-
+	host = re.compile('^(https?://)?((\S*:\S*)@)?([A-z.]*)(:(\d+))?((/\S*)?/(\S*.\S*)?)?', re.I)
 
 	def matchip(IP):
 		
