@@ -1,4 +1,6 @@
-<1.5.10> - 22/05/2008 - added thread locking so output is not jumbleed on screen/disk
+<1.5.11> - 02/06/2008 - now checks for thread support and disables if nescesary
+
+<1.5.10> - 29/05/2008 - added thread locking so output is not jumbuled on screen/disk
 						modified the keyboard handler so CTRL-C is caught twice, 
 												once to wait for threads second to not
 						fixed threading problem so that max thread count is adhered to

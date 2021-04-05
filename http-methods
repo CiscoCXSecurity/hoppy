@@ -12,7 +12,7 @@
 # (auth) will be replaced by the basic auth credentials if supplied
 # (loop) will be replaced in a loop with all entries in the loop file 
 # 
-# Supplied with hoppy 1.5.10 
+# Supplied with hoppy 1.5.11 
 
 
 # Base Case Analysis
